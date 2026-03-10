@@ -1,4 +1,4 @@
-﻿using AsyncAwaitBestPractices;
+using AsyncAwaitBestPractices;
 using Microsoft.Xaml.Behaviors.Core;
 using SharpHook;
 using StageManager.Model;
@@ -32,6 +32,14 @@ namespace StageManager
 		private Point _mouse = new Point(0, 0);
 		private SceneModel? _removedCurrentScene;
 		private SceneModel? _mouseDownScene;
+		private TodoListWindow? _todoWindow;
+		private NotesWindow? _notesWindow;
+
+		// Cached values for the hook thread (avoids querying WPF DependencyProperties and WinForms from the thread pool)
+		private int _cachedPhysicalScreenWidth;
+		private double _cachedTodoWidth = 300;
+		private double _cachedNotesWidth = 320;
+		private double _cachedNotesHeight = 400;
 
 		public bool EnableWindowDropToScene = false;
 		public bool EnableWindowPullToScene = true;
@@ -58,6 +66,10 @@ namespace StageManager
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 			_lastWidth = Width;
 			Mode = WindowMode.OffScreen;
+
+			// Cache the physical screen width once at startup
+			_cachedPhysicalScreenWidth = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width;
+
 			ApplyMicaBackdrop();
 			StartHook();
 		}
@@ -90,6 +102,16 @@ namespace StageManager
 		{
 			base.OnContentRendered(e);
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+
+			// Instantiate the right-edge flyover windows
+			_todoWindow = new TodoListWindow();
+			_todoWindow.Show();
+			_cachedTodoWidth = _todoWindow.Width;
+
+			_notesWindow = new NotesWindow();
+			_notesWindow.Show();
+			_cachedNotesWidth = _notesWindow.Width;
+			_cachedNotesHeight = _notesWindow.Height;
 
 			var windowsManager = new WindowsManager();
 			SceneManager = new SceneManager(windowsManager);
@@ -335,6 +357,7 @@ namespace StageManager
 			_mouse.X = e.Data.X;
 			_mouse.Y = e.Data.Y;
 
+			// --- LEFT SCREEN EDGE (Existing StageManager logic) ---
 			if (Mode == WindowMode.OffScreen && e.Data.X <= 2)
 			{
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.Flyover);
@@ -342,6 +365,49 @@ namespace StageManager
 			else if (Mode == WindowMode.Flyover && e.Data.X > _lastWidth + 40)
 			{
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
+			}
+
+			// --- RIGHT SCREEN EDGE & TOP RIGHT CORNER (New Logic) ---
+			// Skip if windows aren't initialized yet
+			if (_todoWindow is null || _notesWindow is null) return;
+
+			// Use cached values — never access WPF DependencyProperties or WinForms from the hook thread
+			var sw = _cachedPhysicalScreenWidth;
+
+			bool isTopRightCorner = e.Data.X >= sw - 2 && e.Data.Y <= 5;
+			bool isRightEdge = e.Data.X >= sw - 2 && e.Data.Y > 5;
+
+			// Open Notes (Top Right)
+			if (isTopRightCorner && _notesWindow.Mode == WindowMode.OffScreen)
+			{
+				Dispatcher.BeginInvoke(() =>
+				{
+					_todoWindow.Mode = WindowMode.OffScreen; // Close To-Do if open
+					_notesWindow.Mode = WindowMode.Flyover;
+				});
+			}
+			// Open To-Do List (Right Edge)
+			else if (isRightEdge && _todoWindow.Mode == WindowMode.OffScreen && _notesWindow.Mode == WindowMode.OffScreen)
+			{
+				Dispatcher.BeginInvoke(() => _todoWindow.Mode = WindowMode.Flyover);
+			}
+
+			// Hide Logic for Notes Window
+			if (_notesWindow.Mode == WindowMode.Flyover)
+			{
+				if (e.Data.X < sw - _cachedNotesWidth - 40 || e.Data.Y > _cachedNotesHeight + 40)
+				{
+					Dispatcher.BeginInvoke(() => _notesWindow.Mode = WindowMode.OffScreen);
+				}
+			}
+
+			// Hide Logic for To-Do Window
+			if (_todoWindow.Mode == WindowMode.Flyover)
+			{
+				if (e.Data.X < sw - _cachedTodoWidth - 40)
+				{
+					Dispatcher.BeginInvoke(() => _todoWindow.Mode = WindowMode.OffScreen);
+				}
 			}
 		}
 
