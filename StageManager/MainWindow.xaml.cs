@@ -42,7 +42,16 @@ namespace StageManager
 			InitializeComponent();
 			DataContext = this;
 			_overlapCheckTimer = new Timer(OverlapCheck, null, 2500, TIMERINTERVAL_MILLISECONDS);
-			SwitchSceneCommand = new ActionCommand(async model => await SceneManager!.SwitchTo(((SceneModel)model).Scene));
+			SwitchSceneCommand = new ActionCommand(async model =>
+			{
+				var sceneModel = (SceneModel)model;
+				var isCtrlHeld = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+
+				if (isCtrlHeld)
+					await SceneManager!.AddToSplit(sceneModel.Scene!);
+				else
+					await SceneManager!.SwitchTo(sceneModel.Scene);
+			});
 		}
 
 		protected override void OnInitialized(EventArgs e)

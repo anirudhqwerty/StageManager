@@ -1,4 +1,5 @@
-﻿using ControlzEx.Standard;
+﻿#pragma warning disable CS0618
+using ControlzEx.Standard;
 using System;
 using System.Windows;
 using System.Windows.Interop;

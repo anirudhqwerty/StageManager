@@ -22,29 +22,33 @@
     <Window.Resources>
 
         <Style x:Key="SidebarPanel" TargetType="Border">
-            <Setter Property="Background" Value="#DD1A1A1C"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Margin" Value="6,10,6,10"/>
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E8202024" Offset="0"/>
+                        <GradientStop Color="#E81A1A1E" Offset="1"/>
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Margin" Value="6,12,6,12"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.5" Color="#000000"/>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.45" Color="#000000"/>
                 </Setter.Value>
             </Setter>
         </Style>
 
         <Style x:Key="SceneCard" TargetType="Border">
-            <Setter Property="Background" Value="#22FFFFFF"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Margin" Value="6,3,6,3"/>
-            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Background" Value="#20FFFFFF"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Margin" Value="7,4,7,4"/>
+            <Setter Property="Padding" Value="5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="RenderTransform">
                 <Setter.Value>
-                    <TransformGroup>
-                        <ScaleTransform ScaleX="1" ScaleY="1"/>
-                        <SkewTransform AngleY="-2.5"/>
-                    </TransformGroup>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
@@ -52,29 +56,22 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
-                                To="1.06" Duration="0:0:0.15">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                To="1.05" Duration="0:0:0.12">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
-                                To="1.06" Duration="0:0:0.15">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut"/>
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                            <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(SkewTransform.AngleY)"
-                                To="0" Duration="0:0:0.15">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                To="1.05" Duration="0:0:0.12">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                To="#3CFFFFFF" Duration="0:0:0.15"/>
+                                To="#38FFFFFF" Duration="0:0:0.12"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </EventTrigger>
@@ -82,29 +79,22 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
-                                To="1.0" Duration="0:0:0.2">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                To="1.0" Duration="0:0:0.18">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseInOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
-                                To="1.0" Duration="0:0:0.2">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseInOut"/>
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                            <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(SkewTransform.AngleY)"
-                                To="-2.5" Duration="0:0:0.2">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                To="1.0" Duration="0:0:0.18">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseInOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                To="#22FFFFFF" Duration="0:0:0.2"/>
+                                To="#20FFFFFF" Duration="0:0:0.18"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </EventTrigger>
@@ -116,15 +106,10 @@
             <Setter Property="Width" Value="18"/>
             <Setter Property="Margin" Value="1,0"/>
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.5" Color="#000000"/>
-                </Setter.Value>
-            </Setter>
         </Style>
 
         <Style x:Key="ThumbnailBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="ClipToBounds" Value="True"/>
             <Setter Property="Margin" Value="0,0,0,3"/>
         </Style>
@@ -156,7 +141,7 @@
             <ScrollViewer VerticalScrollBarVisibility="Hidden"
                           HorizontalScrollBarVisibility="Disabled"
                           Focusable="False">
-                <StackPanel VerticalAlignment="Center" Margin="0,4,0,4">
+                <StackPanel VerticalAlignment="Center" Margin="0,6,0,6">
 
                     <ItemsControl Name="scenesControl"
                                   ItemsSource="{Binding Scenes}">
@@ -187,16 +172,16 @@
                                                     <Border Style="{StaticResource ThumbnailBorder}">
                                                         <local:DwmThumbnail
                                                             PreviewHandle="{Binding Handle}"
-                                                            MinHeight="60"
-                                                            MinWidth="120"
-                                                            MaxHeight="80"/>
+                                                            MinHeight="65"
+                                                            MinWidth="125"
+                                                            MaxHeight="85"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
 
                                         <ItemsControl HorizontalAlignment="Center"
-                                                      Margin="0,1,0,1"
+                                                      Margin="0,2,0,2"
                                                       ItemsSource="{Binding Windows}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
