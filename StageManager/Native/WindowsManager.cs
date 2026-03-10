@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 using StageManager.Native.PInvoke;
 using StageManager.Native.Window;
 
@@ -23,11 +22,8 @@ namespace StageManager.Native
 
 		private WindowsWindow? _mouseMoveWindow;
 		private readonly object _mouseMoveLock = new object();
-		private Win32.HookProc _mouseHook = null!;
 
 		private readonly List<IntPtr> _winEventHooks = new();
-		private IntPtr _mouseHookHandle;
-		private Thread? _hookThread;
 
 		private Dictionary<WindowsWindow, bool> _floating;
 		private IntPtr _currentProcessWindowHandle;
@@ -66,29 +62,12 @@ namespace StageManager.Native
 			RegisterWinEventHook(Win32.EVENT_CONSTANTS.EVENT_SYSTEM_FOREGROUND, Win32.EVENT_CONSTANTS.EVENT_SYSTEM_FOREGROUND);
 			RegisterWinEventHook(Win32.EVENT_CONSTANTS.EVENT_OBJECT_LOCATIONCHANGE, Win32.EVENT_CONSTANTS.EVENT_OBJECT_LOCATIONCHANGE);
 
-			_mouseHook = MouseHook;
-
 			Win32.EnumWindows((handle, param) =>
 			{
 				if (Win32Helper.IsAppWindow(handle))
 					RegisterWindow(handle, false);
 				return true;
 			}, IntPtr.Zero);
-
-			_hookThread = new Thread(() =>
-			{
-				_mouseHookHandle = Win32.SetWindowsHookEx(
-					Win32.WH_MOUSE_LL,
-					_mouseHook,
-					currentProcess.MainModule!.BaseAddress,
-					0);
-
-				Application.Run();
-			});
-
-			_hookThread.Name = "WindowsManager.HookThread";
-			_hookThread.IsBackground = true;
-			_hookThread.Start();
 
 			return Task.CompletedTask;
 		}
@@ -102,11 +81,6 @@ namespace StageManager.Native
 				try { Win32.UnhookWinEvent(hook); } catch { }
 			}
 			_winEventHooks.Clear();
-
-			if (_hookThread is not null && _hookThread.IsAlive)
-			{
-				try { Application.ExitThread(); } catch { }
-			}
 		}
 
 		private void RegisterWinEventHook(Win32.EVENT_CONSTANTS min, Win32.EVENT_CONSTANTS max)
@@ -142,14 +116,6 @@ namespace StageManager.Native
 				}
 				window.Focus();
 			}
-		}
-
-		private IntPtr MouseHook(int nCode, UIntPtr wParam, IntPtr lParam)
-		{
-			if (nCode == 0 && (uint)wParam == Win32.WM_LBUTTONUP)
-				HandleWindowMoveEnd();
-
-			return Win32.CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
 		}
 
 		private void WindowHook(IntPtr hWinEventHook, Win32.EVENT_CONSTANTS eventType, IntPtr hwnd,

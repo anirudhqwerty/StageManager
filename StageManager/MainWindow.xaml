@@ -22,19 +22,20 @@
     <Window.Resources>
 
         <Style x:Key="SidebarPanel" TargetType="Border">
-            <Setter Property="Background">
-                <Setter.Value>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#E8202024" Offset="0"/>
-                        <GradientStop Color="#E81A1A1E" Offset="1"/>
-                    </LinearGradientBrush>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Background" Value="#01000000"/>
             <Setter Property="CornerRadius" Value="14"/>
             <Setter Property="Margin" Value="6,12,6,12"/>
-            <Setter Property="Effect">
+        </Style>
+
+        <Style x:Key="SidebarShadow" TargetType="Border">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Margin" Value="2,8,2,8"/>
+            <Setter Property="Background">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.45" Color="#000000"/>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.7" RadiusY="0.6">
+                        <GradientStop Color="#40000000" Offset="0.85"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -45,10 +46,12 @@
             <Setter Property="Margin" Value="7,4,7,4"/>
             <Setter Property="Padding" Value="5"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="RenderTransform">
                 <Setter.Value>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    <TranslateTransform Y="0"/>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
@@ -56,22 +59,18 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                To="1.05" Duration="0:0:0.12">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                To="-3" Duration="0:0:0.15">
                                 <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut"/>
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                            <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                To="1.05" Duration="0:0:0.12">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut"/>
+                                    <CircleEase EasingMode="EaseOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <ColorAnimation
+                                Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                To="#50FFFFFF" Duration="0:0:0.15"/>
+                            <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                To="#38FFFFFF" Duration="0:0:0.12"/>
+                                To="#30FFFFFF" Duration="0:0:0.15"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </EventTrigger>
@@ -79,19 +78,15 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                To="1.0" Duration="0:0:0.18">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                To="0" Duration="0:0:0.18">
                                 <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseInOut"/>
+                                    <CircleEase EasingMode="EaseInOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
-                            <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                To="1.0" Duration="0:0:0.18">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseInOut"/>
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
+                            <ColorAnimation
+                                Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                To="#00FFFFFF" Duration="0:0:0.18"/>
                             <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
                                 To="#20FFFFFF" Duration="0:0:0.18"/>
@@ -104,7 +99,7 @@
         <Style x:Key="AppIconImage" TargetType="Image">
             <Setter Property="Height" Value="18"/>
             <Setter Property="Width" Value="18"/>
-            <Setter Property="Margin" Value="1,0"/>
+            <Setter Property="Margin" Value="-4,0,0,0"/>
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
         </Style>
 
@@ -112,13 +107,29 @@
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="ClipToBounds" Value="True"/>
             <Setter Property="Margin" Value="0,0,0,3"/>
+            <Style.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                             From="0" To="1" Duration="0:0:0.25"/>
+                            <ThicknessAnimation Storyboard.TargetProperty="Margin"
+                                                From="0,10,0,-10" To="0,0,0,3" Duration="0:0:0.35">
+                                <ThicknessAnimation.EasingFunction>
+                                    <CircleEase EasingMode="EaseOut"/>
+                                </ThicknessAnimation.EasingFunction>
+                            </ThicknessAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Style.Triggers>
         </Style>
 
         <Storyboard x:Key="SidebarFadeIn">
             <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                             From="0" To="1" Duration="0:0:0.35">
+                             From="0" To="1" Duration="0:0:0.3">
                 <DoubleAnimation.EasingFunction>
-                    <CubicEase EasingMode="EaseOut"/>
+                    <CircleEase EasingMode="EaseOut"/>
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
@@ -126,6 +137,12 @@
     </Window.Resources>
 
     <Grid>
+
+        <Border Style="{StaticResource SidebarShadow}"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                MinHeight="60"
+                IsHitTestVisible="False"/>
 
         <Border Style="{StaticResource SidebarPanel}"
                 HorizontalAlignment="Left"
@@ -181,7 +198,7 @@
                                         </ItemsControl>
 
                                         <ItemsControl HorizontalAlignment="Center"
-                                                      Margin="0,2,0,2"
+                                                      Margin="4,2,0,2"
                                                       ItemsSource="{Binding Windows}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>

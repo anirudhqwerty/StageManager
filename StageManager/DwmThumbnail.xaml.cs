@@ -56,8 +56,20 @@ namespace StageManager
 
 			if (nameof(PreviewHandle).Equals(e.Property.Name))
 			{
-				if ((IntPtr)e.OldValue == IntPtr.Zero && (IntPtr)e.NewValue != IntPtr.Zero)
+				var oldHandle = (IntPtr)e.OldValue;
+				var newHandle = (IntPtr)e.NewValue;
+
+				if (newHandle != IntPtr.Zero)
+				{
+					if (oldHandle != IntPtr.Zero)
+						UnregisterThumbnail();
+
 					StartCapture();
+				}
+				else if (oldHandle != IntPtr.Zero)
+				{
+					UnregisterThumbnail();
+				}
 
 				UpdateThumbnailProperties();
 			}

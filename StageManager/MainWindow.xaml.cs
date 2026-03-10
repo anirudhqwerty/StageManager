@@ -22,7 +22,6 @@ namespace StageManager
 {
 	public partial class MainWindow : Window
 	{
-		private const int TIMERINTERVAL_MILLISECONDS = 300;
 		private const int MAX_SCENES = 6;
 		private const string APP_NAME = "StageManager";
 		private IntPtr _thisHandle;
@@ -30,7 +29,6 @@ namespace StageManager
 		private volatile bool _hookPaused;
 		private WindowMode _mode;
 		private double _lastWidth;
-		private Timer? _overlapCheckTimer;
 		private Point _mouse = new Point(0, 0);
 		private SceneModel? _removedCurrentScene;
 		private SceneModel? _mouseDownScene;
@@ -42,7 +40,6 @@ namespace StageManager
 		{
 			InitializeComponent();
 			DataContext = this;
-			_overlapCheckTimer = new Timer(OverlapCheck, null, 2500, TIMERINTERVAL_MILLISECONDS);
 			SwitchSceneCommand = new ActionCommand(async model =>
 			{
 				var sceneModel = (SceneModel)model;
@@ -61,7 +58,23 @@ namespace StageManager
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 			_lastWidth = Width;
 			Mode = WindowMode.OffScreen;
+			ApplyMicaBackdrop();
 			StartHook();
+		}
+
+		private void ApplyMicaBackdrop()
+		{
+			try
+			{
+				int darkMode = 1;
+				NativeMethods.DwmSetWindowAttribute(_thisHandle,
+					NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+
+				int backdropType = 3;
+				NativeMethods.DwmSetWindowAttribute(_thisHandle,
+					NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(int));
+			}
+			catch { }
 		}
 
 		protected override void OnClosed(EventArgs e)
@@ -167,9 +180,6 @@ namespace StageManager
 		{
 			if (_hookPaused) return;
 
-			if (EnableWindowDropToScene)
-				_overlapCheckTimer?.Change(TimeSpan.Zero, TimeSpan.Zero);
-
 			var foregroundWindow = Win32.GetForegroundWindow();
 			if (foregroundWindow != _thisHandle)
 				return;
@@ -190,8 +200,6 @@ namespace StageManager
 
 			if (EnableWindowDropToScene)
 			{
-				_overlapCheckTimer?.Change(0, TIMERINTERVAL_MILLISECONDS);
-
 				var foregroundWindow = Win32.GetForegroundWindow();
 
 				if (foregroundWindow == _thisHandle)
@@ -284,8 +292,8 @@ namespace StageManager
 			var easingMode = isIncoming ? EasingMode.EaseOut : EasingMode.EaseIn;
 
 			var animation = new DoubleAnimationUsingKeyFrames();
-			animation.Duration = new Duration(TimeSpan.FromMilliseconds(280));
-			var easingFunction = new CubicEase { EasingMode = easingMode };
+			animation.Duration = new Duration(TimeSpan.FromMilliseconds(220));
+			var easingFunction = new CircleEase { EasingMode = easingMode };
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(Left, KeyTime.FromPercent(0)));
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(newLeft, KeyTime.FromPercent(1.0), easingFunction));
 
@@ -332,14 +340,6 @@ namespace StageManager
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.Flyover);
 			}
 			else if (Mode == WindowMode.Flyover && e.Data.X > _lastWidth + 40)
-			{
-				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
-			}
-		}
-
-		private void OverlapCheck(object? _)
-		{
-			if (_mouse.X > _lastWidth + 40 && Mode == WindowMode.Flyover)
 			{
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
