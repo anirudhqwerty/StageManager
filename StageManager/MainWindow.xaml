@@ -14,40 +14,37 @@
     WindowStyle="None"
     Title="StageManager"
     Height="900"
-    Width="200"
+    Width="160"
     ShowActivated="False"
     Background="Transparent"
     Name="thisWindow">
 
     <Window.Resources>
 
-        <!-- Sidebar background pill -->
         <Style x:Key="SidebarPanel" TargetType="Border">
-            <Setter Property="Background" Value="#CC1C1C1E"/>
-            <Setter Property="CornerRadius" Value="14"/>
-            <Setter Property="Margin" Value="8,12,8,12"/>
+            <Setter Property="Background" Value="#DD1A1A1C"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Margin" Value="6,10,6,10"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.55" Color="#000000"/>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.5" Color="#000000"/>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- Hover glow effect for scene cards -->
-        <DropShadowEffect x:Key="SceneCardGlow"
-                          BlurRadius="16" ShadowDepth="0" Opacity="0.35" Color="#88BBFF"/>
-
-        <!-- Per-scene card with smooth hover animations -->
         <Style x:Key="SceneCard" TargetType="Border">
-            <Setter Property="Background" Value="#26FFFFFF"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Margin" Value="8,4,8,4"/>
-            <Setter Property="Padding" Value="6,6,6,6"/>
+            <Setter Property="Background" Value="#22FFFFFF"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="6,3,6,3"/>
+            <Setter Property="Padding" Value="4"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="RenderTransform">
                 <Setter.Value>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                        <SkewTransform AngleY="-2.5"/>
+                    </TransformGroup>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
@@ -55,22 +52,29 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                To="1.04" Duration="0:0:0.15">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                To="1.06" Duration="0:0:0.15">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                To="1.04" Duration="0:0:0.15">
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
+                                To="1.06" Duration="0:0:0.15">
+                                <DoubleAnimation.EasingFunction>
+                                    <CubicEase EasingMode="EaseOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(SkewTransform.AngleY)"
+                                To="0" Duration="0:0:0.15">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                To="#40FFFFFF" Duration="0:0:0.15"/>
+                                To="#3CFFFFFF" Duration="0:0:0.15"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </EventTrigger>
@@ -78,59 +82,56 @@
                     <BeginStoryboard>
                         <Storyboard>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
                                 To="1.0" Duration="0:0:0.2">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseInOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <DoubleAnimation
-                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
                                 To="1.0" Duration="0:0:0.2">
+                                <DoubleAnimation.EasingFunction>
+                                    <CubicEase EasingMode="EaseInOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(SkewTransform.AngleY)"
+                                To="-2.5" Duration="0:0:0.2">
                                 <DoubleAnimation.EasingFunction>
                                     <CubicEase EasingMode="EaseInOut"/>
                                 </DoubleAnimation.EasingFunction>
                             </DoubleAnimation>
                             <ColorAnimation
                                 Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                To="#26FFFFFF" Duration="0:0:0.2"/>
+                                To="#22FFFFFF" Duration="0:0:0.2"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </EventTrigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Active scene card (current scene is hidden from sidebar — this is for future use) -->
-        <Style x:Key="SceneCardActive" BasedOn="{StaticResource SceneCard}" TargetType="Border">
-            <Setter Property="Background" Value="#55FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#99FFFFFF"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-
-        <!-- App icon with drop shadow -->
         <Style x:Key="AppIconImage" TargetType="Image">
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="Width" Value="22"/>
-            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Margin" Value="1,0"/>
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.6" Color="#000000"/>
+                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.5" Color="#000000"/>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- DWM thumbnail wrapper -->
         <Style x:Key="ThumbnailBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="CornerRadius" Value="5"/>
             <Setter Property="ClipToBounds" Value="True"/>
-            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
         </Style>
 
-        <!-- Fade-in animation for the sidebar -->
         <Storyboard x:Key="SidebarFadeIn">
             <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                             From="0" To="1" Duration="0:0:0.4">
+                             From="0" To="1" Duration="0:0:0.35">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseOut"/>
                 </DoubleAnimation.EasingFunction>
@@ -139,16 +140,13 @@
 
     </Window.Resources>
 
-    <!-- Root: transparent, full-height, click-through except on sidebar -->
     <Grid>
 
-        <!-- Sidebar container — left-aligned, vertically centered -->
         <Border Style="{StaticResource SidebarPanel}"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Center"
-                MinHeight="80">
+                MinHeight="60">
 
-            <!-- Trigger fade-in on load -->
             <Border.Triggers>
                 <EventTrigger RoutedEvent="Loaded">
                     <BeginStoryboard Storyboard="{StaticResource SidebarFadeIn}"/>
@@ -158,14 +156,13 @@
             <ScrollViewer VerticalScrollBarVisibility="Hidden"
                           HorizontalScrollBarVisibility="Disabled"
                           Focusable="False">
-                <StackPanel VerticalAlignment="Center" Margin="0,6,0,6">
+                <StackPanel VerticalAlignment="Center" Margin="0,4,0,4">
 
                     <ItemsControl Name="scenesControl"
                                   ItemsSource="{Binding Scenes}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
 
-                                <!-- One scene = one card -->
                                 <Border Style="{StaticResource SceneCard}"
                                         Visibility="{Binding Visibility}">
 
@@ -179,7 +176,6 @@
 
                                     <StackPanel Orientation="Vertical">
 
-                                        <!-- DWM live thumbnails — stacked/overlapped -->
                                         <ItemsControl ItemsSource="{Binding Windows}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
@@ -191,17 +187,16 @@
                                                     <Border Style="{StaticResource ThumbnailBorder}">
                                                         <local:DwmThumbnail
                                                             PreviewHandle="{Binding Handle}"
-                                                            MinHeight="90"
-                                                            MinWidth="160"
-                                                            MaxHeight="110"/>
+                                                            MinHeight="60"
+                                                            MinWidth="120"
+                                                            MaxHeight="80"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
 
-                                        <!-- App icon row below thumbnail -->
                                         <ItemsControl HorizontalAlignment="Center"
-                                                      Margin="0,2,0,2"
+                                                      Margin="0,1,0,1"
                                                       ItemsSource="{Binding Windows}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
@@ -228,7 +223,6 @@
             </ScrollViewer>
         </Border>
 
-        <!-- System tray icon -->
         <tb:TaskbarIcon x:Name="trayIcon"
                         Visibility="Visible"
                         ToolTipText="Stage Manager"

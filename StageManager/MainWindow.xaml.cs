@@ -20,9 +20,6 @@ using System.Windows.Media.Animation;
 
 namespace StageManager
 {
-	/// <summary>
-	/// Interaction logic for MainWindow.xaml
-	/// </summary>
 	public partial class MainWindow : Window
 	{
 		private const int TIMERINTERVAL_MILLISECONDS = 300;
@@ -43,41 +40,31 @@ namespace StageManager
 		public MainWindow()
 		{
 			InitializeComponent();
-
 			DataContext = this;
-
 			_overlapCheckTimer = new Timer(OverlapCheck, null, 2500, TIMERINTERVAL_MILLISECONDS);
-
 			SwitchSceneCommand = new ActionCommand(async model => await SceneManager!.SwitchTo(((SceneModel)model).Scene));
 		}
 
 		protected override void OnInitialized(EventArgs e)
 		{
 			base.OnInitialized(e);
-
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 			_lastWidth = Width;
-
-			StartHook();	
+			StartHook();
 		}
 
 		protected override void OnClosed(EventArgs e)
 		{
 			StopHook();
-
 			trayIcon.Dispose();
-
 			SceneManager?.Stop();
-
 			base.OnClosed(e);
-
 			Environment.Exit(0);
 		}
 
 		protected override async void OnContentRendered(EventArgs e)
 		{
 			base.OnContentRendered(e);
-
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
 			var windowsManager = new WindowsManager();
@@ -101,7 +88,7 @@ namespace StageManager
 			for (int i = 0; i < initialScenes.Length; i++)
 			{
 				var model = SceneModel.FromScene(initialScenes[i]);
-				model.IsVisible = i <= MAX_SCENES; // i is zero based, so it should be i+1 but one scene gets selected (and removed from the sidebar) that makes i+0 again
+				model.IsVisible = i <= MAX_SCENES;
 				Scenes.Add(model);
 			}
 		}
@@ -125,7 +112,6 @@ namespace StageManager
 			}
 
 			_removedCurrentScene = currentModel;
-
 			SyncVisibilityByUpdatedTimeStamp();
 		}
 
@@ -168,7 +154,6 @@ namespace StageManager
 
 		private void OnMousePressed(object? sender, MouseHookEventArgs e)
 		{
-			// if it's allowed to drag windows into scenes, we cannot hide the scenes
 			if (EnableWindowDropToScene)
 				_overlapCheckTimer?.Change(TimeSpan.Zero, TimeSpan.Zero);
 
@@ -188,7 +173,6 @@ namespace StageManager
 
 		private void OnMouseReleased(object? sender, MouseHookEventArgs e)
 		{
-			// if it's allowed to drag windows into scenes, we cannot hide the scenes
 			if (EnableWindowDropToScene)
 			{
 				_overlapCheckTimer?.Change(0, TIMERINTERVAL_MILLISECONDS);
@@ -202,7 +186,6 @@ namespace StageManager
 				this.Dispatcher.Invoke(() =>
 				{
 					var sceneModel = FindSceneByPoint(screenPoint);
-
 					if (sceneModel is object)
 						SceneManager?.MoveWindow(foregroundWindow, sceneModel.Scene!).SafeFireAndForget();
 				});
@@ -226,12 +209,10 @@ namespace StageManager
 			var pointOnWindow = new Point(p.X - thisWindow.Location.X, p.Y - thisWindow.Location.Y);
 
 			var dpi = VisualTreeHelper.GetDpi(this);
-
 			pointOnWindow.X /= dpi.DpiScaleX;
 			pointOnWindow.Y /= dpi.DpiScaleY;
 
 			SceneModel? model = null;
-
 			var element = VisualTreeHelper.HitTest(this, pointOnWindow)?.VisualHit;
 
 			while (element is not null)
@@ -241,12 +222,12 @@ namespace StageManager
 					model = m;
 					break;
 				}
-
 				element = element.GetParentObject();
 			}
 
 			return model;
 		}
+
 		private void SyncVisibilityByUpdatedTimeStamp()
 		{
 			var scenes = Scenes.OrderByDescending(s => s.Updated).ToArray();
@@ -273,9 +254,7 @@ namespace StageManager
 					return;
 
 				_mode = value;
-
 				this.Topmost = value == WindowMode.Flyover;
-
 				ApplyWindowMode();
 			}
 		}
@@ -290,7 +269,7 @@ namespace StageManager
 			var easingMode = isIncoming ? EasingMode.EaseOut : EasingMode.EaseIn;
 
 			var animation = new DoubleAnimationUsingKeyFrames();
-			animation.Duration = new Duration(TimeSpan.FromMilliseconds(300));
+			animation.Duration = new Duration(TimeSpan.FromMilliseconds(280));
 			var easingFunction = new CubicEase { EasingMode = easingMode };
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(Left, KeyTime.FromPercent(0)));
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(newLeft, KeyTime.FromPercent(1.0), easingFunction));
@@ -301,11 +280,9 @@ namespace StageManager
 		private void StartHook()
 		{
 			_hook = new TaskPoolGlobalHook();
-
 			_hook.MousePressed += OnMousePressed;
 			_hook.MouseReleased += OnMouseReleased;
 			_hook.MouseMoved += _hook_MouseMoved;
-
 			Task.Run(_hook.Run);
 		}
 
@@ -331,7 +308,7 @@ namespace StageManager
 			_mouse.X = e.Data.X;
 			_mouse.Y = e.Data.Y;
 
-			if (Mode == WindowMode.OffScreen && e.Data.X <= 8)
+			if (Mode == WindowMode.OffScreen && e.Data.X <= 6)
 			{
 				Dispatcher.Invoke(() => Mode = WindowMode.Flyover);
 			}
@@ -341,7 +318,7 @@ namespace StageManager
 		{
 			if (SceneManager is null) return;
 
-			var currentWindows = SceneManager.GetCurrentWindows().ToArray(); // in case the enumeration changes
+			var currentWindows = SceneManager.GetCurrentWindows().ToArray();
 			UpdateModeByWindows(currentWindows);
 		}
 
@@ -374,30 +351,18 @@ namespace StageManager
 		}
 
 		public static bool StartsWithWindows
-		{ 
+		{
 			get => AutoStart.IsStartup(APP_NAME);
 			set => AutoStart.SetStartup(APP_NAME, value);
 		}
 
-		private void MenuItem_ProjectPage_Click(object sender, RoutedEventArgs e)
-		{
-			NavigateToProjectPage();
-		}
+		private void MenuItem_ProjectPage_Click(object sender, RoutedEventArgs e) => NavigateToProjectPage();
 
-		private void MenuItem_Quit_Click(object sender, RoutedEventArgs e)
-		{
-			Close();
-		}
+		private void MenuItem_Quit_Click(object sender, RoutedEventArgs e) => Close();
 
-		private void ContextMenu_Closed(object sender, RoutedEventArgs e)
-		{
-			StartHook();
-		}
+		private void ContextMenu_Closed(object sender, RoutedEventArgs e) => StartHook();
 
-		private void ContextMenu_Opened(object sender, RoutedEventArgs e)
-		{
-			StopHook();
-		}
+		private void ContextMenu_Opened(object sender, RoutedEventArgs e) => StopHook();
 	}
 
 	public enum WindowMode

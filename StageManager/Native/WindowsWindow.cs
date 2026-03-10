@@ -14,6 +14,8 @@ namespace StageManager.Native
 	{
 		private readonly IntPtr _handle;
 		private bool _didManualHide;
+		private Icon? _cachedIcon;
+		private bool _iconExtracted;
 
 		public event IWindowDelegate? WindowClosed;
 		public event IWindowDelegate? WindowUpdated;
@@ -53,7 +55,6 @@ namespace StageManager.Native
 					}
 					catch (Exception)
 					{
-						// Access denied to MainModule (common for elevated processes)
 						_processFileName = process.ProcessName;
 					}
 				}
@@ -78,16 +79,12 @@ namespace StageManager.Native
 			Win32.GetWindowThreadProcessId(windowHandle, out var processId);
 			if (processId == 0) return null;
 
-			var result = (int)processId;
-
 			try
 			{
-				var process = Process.GetProcessById(result);
+				var process = Process.GetProcessById((int)processId);
 
-				// Handle UWP apps hosted in ApplicationFrameHost
 				if (process.ProcessName.Equals("ApplicationFrameHost", StringComparison.OrdinalIgnoreCase))
 				{
-					// Try to find the real hosted UWP process by looking at child windows
 					var uwpProcess = TryGetUwpHostedProcess(windowHandle);
 					if (uwpProcess != null)
 						return uwpProcess;
@@ -97,15 +94,10 @@ namespace StageManager.Native
 			}
 			catch (ArgumentException)
 			{
-				// Process already exited
 				return null;
 			}
 		}
 
-		/// <summary>
-		/// UWP apps run inside ApplicationFrameHost. We walk child windows to find the
-		/// actual UWP app process so we get the right name/icon.
-		/// </summary>
 		private Process? TryGetUwpHostedProcess(IntPtr frameHostWindow)
 		{
 			Process? uwpProcess = null;
@@ -121,10 +113,10 @@ namespace StageManager.Native
 						if (!candidate.ProcessName.Equals("ApplicationFrameHost", StringComparison.OrdinalIgnoreCase))
 						{
 							uwpProcess = candidate;
-							return false; // Stop enumeration
+							return false;
 						}
 					}
-					catch { /* Process gone */ }
+					catch { }
 				}
 				return true;
 			}, IntPtr.Zero);
@@ -300,18 +292,24 @@ namespace StageManager.Native
 
 		public Icon? ExtractIcon()
 		{
+			if (_iconExtracted)
+				return _cachedIcon;
+
+			_iconExtracted = true;
+
 			if (string.IsNullOrWhiteSpace(_processExecutable))
 				return null;
 
 			try
 			{
-				return Icon.ExtractAssociatedIcon(_processExecutable);
+				_cachedIcon = Icon.ExtractAssociatedIcon(_processExecutable);
 			}
 			catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
 			{
-				// File gone, locked, or we don't have permission - silently return null
-				return null;
+				_cachedIcon = null;
 			}
+
+			return _cachedIcon;
 		}
 	}
 }

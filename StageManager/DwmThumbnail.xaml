@@ -5,22 +5,16 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     mc:Ignorable="d"
-    d:DesignHeight="110" d:DesignWidth="160">
+    d:DesignHeight="80" d:DesignWidth="120">
     <Grid>
-        <!-- Rounded clip container for the DWM thumbnail surface -->
-        <Border CornerRadius="6"
+        <Border CornerRadius="5"
                 ClipToBounds="True"
-                Background="#FF2C2C2E">
-            <!--
-                The DWM thumbnail is rendered directly onto the window surface in the
-                bounds reported by DwmThumbnail.xaml.cs — this Rectangle acts as the
-                placeholder/background that shows through when no thumbnail is available.
-            -->
-            <Rectangle Fill="#FF2C2C2E" RadiusX="6" RadiusY="6"/>
+                Background="#FF2C2C2E"
+                CacheMode="BitmapCache">
+            <Rectangle Fill="#FF2C2C2E" RadiusX="5" RadiusY="5"/>
         </Border>
-        <!-- Subtle inner border ring to give cards definition -->
-        <Border CornerRadius="6"
-                BorderBrush="#20FFFFFF"
+        <Border CornerRadius="5"
+                BorderBrush="#18FFFFFF"
                 BorderThickness="0.5"
                 IsHitTestVisible="False"/>
     </Grid>

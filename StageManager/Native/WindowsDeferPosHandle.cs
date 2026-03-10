@@ -8,7 +8,6 @@ namespace StageManager.Native
     public class WindowsDeferPosHandle : IWindowsDeferPosHandle
     {
         private IntPtr _info;
-
         private List<IWindow> _toMinimize;
         private List<IWindow> _toMaximize;
         private List<IWindow> _toNormal;
@@ -26,16 +25,12 @@ namespace StageManager.Native
             foreach (var w in _toMinimize)
             {
                 if (!w.IsMinimized)
-                {
                     Win32.ShowWindow(w.Handle, Win32.SW.SW_MINIMIZE);
-                }
             }
             foreach (var w in _toMaximize)
             {
                 if (!w.IsMaximized)
-                {
                     Win32.ShowWindow(w.Handle, Win32.SW.SW_SHOWMAXIMIZED);
-                }
             }
             foreach (var w in _toNormal)
             {
@@ -65,7 +60,6 @@ namespace StageManager.Native
                 _toNormal.Add(window);
             }
 
-            // Calculate final position for window
             var offset = window.Offset;
             int X = location.X + offset.X;
             int Y = location.Y + offset.Y;

@@ -10,7 +10,6 @@ namespace StageManager
 
 		public static void SetStartup(string appName, bool startup)
 		{
-			// OpenSubKey can return null if the key doesn't exist - was an NRE before
 			using var key = Registry.CurrentUser.OpenSubKey(REG_KEY, writable: true);
 			if (key is null)
 				return;

@@ -6,15 +6,14 @@ using System.Windows.Media;
 
 namespace StageManager
 {
-	/// <summary>
-	/// Interaction logic for DwmThumbnail.xaml
-	/// </summary>
 	public partial class DwmThumbnail : UserControl
 	{
 		public DwmThumbnail()
 		{
 			InitializeComponent();
+			CacheMode = new BitmapCache();
 			LayoutUpdated += DwmThumbnail_LayoutUpdated;
+			Unloaded += DwmThumbnail_Unloaded;
 		}
 
 		private IntPtr _dwmThumbnail;
@@ -37,7 +36,9 @@ namespace StageManager
 			if (_dpiScaleFactor is null)
 			{
 				var source = PresentationSource.FromVisual(this);
-				_dpiScaleFactor = source?.CompositionTarget != null ? new Point(source.CompositionTarget.TransformToDevice.M11, source.CompositionTarget.TransformToDevice.M22) : new Point(1.0d, 1.0d);
+				_dpiScaleFactor = source?.CompositionTarget != null
+					? new Point(source.CompositionTarget.TransformToDevice.M11, source.CompositionTarget.TransformToDevice.M22)
+					: new Point(1.0d, 1.0d);
 			}
 
 			return _dpiScaleFactor.Value;
@@ -63,14 +64,27 @@ namespace StageManager
 
 			if (nameof(IsVisible).Equals(e.Property.Name) && !(bool)e.NewValue && _dwmThumbnail != IntPtr.Zero)
 			{
-				NativeMethods.DwmUnregisterThumbnail(_dwmThumbnail);
-				_dwmThumbnail = IntPtr.Zero;
+				UnregisterThumbnail();
 			}
 		}
 
 		private void DwmThumbnail_LayoutUpdated(object? sender, EventArgs e)
 		{
 			UpdateThumbnailProperties();
+		}
+
+		private void DwmThumbnail_Unloaded(object? sender, RoutedEventArgs e)
+		{
+			UnregisterThumbnail();
+		}
+
+		private void UnregisterThumbnail()
+		{
+			if (_dwmThumbnail != IntPtr.Zero)
+			{
+				NativeMethods.DwmUnregisterThumbnail(_dwmThumbnail);
+				_dwmThumbnail = IntPtr.Zero;
+			}
 		}
 
 		public static Rect BoundsRelativeTo(FrameworkElement element, Visual relativeTo)

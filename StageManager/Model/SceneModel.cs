@@ -38,7 +38,6 @@ namespace StageManager.Model
 			{
 				if (Windows.Count > i && Windows[i].Window.Handle == updatedWindows[i].Handle)
 				{
-					// same position - just update
 					Windows[i].Window = updatedWindows[i];
 				}
 				else
@@ -46,19 +45,16 @@ namespace StageManager.Model
 					var windowToUpdate = Windows.FirstOrDefault(w => w.Window.Handle == updatedWindows[i].Handle);
 					if (windowToUpdate is object)
 					{
-						// has the window but other position -> update and move
 						windowToUpdate.Window = updatedWindows[i];
 						Windows.Move(Windows.IndexOf(windowToUpdate), i);
 					}
 					else
 					{
-						// no window to update --> add/insert
 						Windows.Insert(i, new WindowModel(updatedWindows[i]));
 					}
 				}
 			}
 
-			// remove windows that have been gone
 			if (Windows.Count > updatedScene.Windows.Count())
 			{
 				for (int i = Windows.Count - 1; i >= 0; i--)

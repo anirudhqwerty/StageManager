@@ -14,13 +14,7 @@ namespace StageManager
 	public class SceneManager
 	{
 		private readonly Desktop _desktop;
-
-		// BUG FIX: _scenes was initialized lazily in GetScenes(), but WindowsManager events
-		// fire on background threads immediately after Start(). Any event arriving before the
-		// first call to GetScenes() would hit a null _scenes and throw a NullReferenceException.
-		// Now we initialize eagerly to an empty list so all code paths are safe.
 		private List<Scene> _scenes = new();
-
 		private Scene? _current;
 		private volatile bool _suspend = false;
 		private Guid? _reentrancyLockSceneId;
@@ -37,7 +31,6 @@ namespace StageManager
 		{
 			WindowsManager = windowsManager ?? throw new ArgumentNullException(nameof(windowsManager));
 			_desktop = new Desktop();
-			_desktop.HideIcons();
 		}
 
 		public async Task Start()
@@ -56,14 +49,6 @@ namespace StageManager
 		public void Stop()
 		{
 			WindowsManager.Stop();
-
-			foreach (var scene in _scenes)
-			{
-				foreach (var w in scene.Windows)
-					WindowStrategy.Show(w);
-			}
-
-			_desktop.ShowIcons();
 		}
 
 		private void WindowsManager_WindowUpdated(IWindow window, WindowUpdateType type)
@@ -108,9 +93,6 @@ namespace StageManager
 		public Scene? FindSceneForWindow(IntPtr handle)
 			=> _scenes.FirstOrDefault(s => s.Windows.Any(w => w.Handle == handle));
 
-		private Scene? FindSceneForProcess(string processName)
-			=> _scenes.FirstOrDefault(s => string.Equals(s.Key, processName, StringComparison.OrdinalIgnoreCase));
-
 		private void WindowsManager_WindowCreated(IWindow window, bool firstCreate)
 		{
 			SwitchToSceneByNewWindow(window).SafeFireAndForget();
@@ -131,32 +113,13 @@ namespace StageManager
 
 		private async Task SwitchToSceneByNewWindow(IWindow window)
 		{
-			var existentScene = FindSceneForProcess(GetWindowGroupKey(window));
-			var scene = existentScene ?? new Scene(window.ProcessName, window);
-
-			if (existentScene is null)
-			{
-				_scenes.Add(scene);
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Created));
-			}
-			else
-			{
-				scene.Add(window);
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Updated));
-			}
+			var scene = new Scene(GetWindowGroupKey(window), window);
+			_scenes.Add(scene);
+			SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Created));
 
 			await SwitchTo(scene).ConfigureAwait(true);
 		}
 
-		/// <summary>
-		/// Detects when an app reactivates one of its own windows immediately after being hidden
-		/// (e.g. Teams floating call window). Without this guard, we'd get an infinite hide/show loop.
-		///
-		/// BUG FIX: The original used a bare Task.Run with Task.Delay and no cancellation.
-		/// Multiple rapid scene switches would spawn multiple timer tasks, each clearing the lock
-		/// at a different time and potentially interfering with each other.
-		/// Now we cancel any pending timer before starting a new one.
-		/// </summary>
 		private bool IsReentrancy(Scene? scene)
 		{
 			if (scene is null) return false;
@@ -164,7 +127,6 @@ namespace StageManager
 
 			if (_current is not null)
 			{
-				// Cancel any previous pending lock-clear task
 				_reentrancyCts?.Cancel();
 				_reentrancyCts = new CancellationTokenSource();
 
@@ -178,7 +140,7 @@ namespace StageManager
 						await Task.Delay(1000, token).ConfigureAwait(false);
 						_reentrancyLockSceneId = null;
 					}
-					catch (OperationCanceledException) { /* Superseded by a newer switch, that's fine */ }
+					catch (OperationCanceledException) { }
 				}).SafeFireAndForget();
 			}
 
@@ -194,10 +156,6 @@ namespace StageManager
 			{
 				_suspend = true;
 
-				var otherWindows = GetSceneableWindows()
-					.Except(scene?.Windows ?? Array.Empty<IWindow>())
-					.ToArray();
-
 				var prior = _current;
 				_current = scene;
 
@@ -206,31 +164,16 @@ namespace StageManager
 
 				if (scene is not null)
 				{
-					foreach (var w in scene.Windows)
-						WindowStrategy.Show(w);
-				}
-
-				foreach (var o in otherWindows)
-					WindowStrategy.Hide(o);
-
-				CurrentSceneSelectionChanged?.Invoke(this, new CurrentSceneSelectionChangedEventArgs(prior, _current));
-
-				if (scene is null)
-					_desktop.ShowIcons();
-				else
-					_desktop.HideIcons();
-
-				// Focus the most recently active window in the scene so the user can work immediately.
-				// This is deferred slightly to let the show/hide operations complete first.
-				if (scene is not null)
-				{
 					var windowToFocus = scene.Windows.LastOrDefault();
 					if (windowToFocus is not null)
 					{
-						await Task.Delay(50).ConfigureAwait(true); // Let minimize animations settle
+						await Task.Delay(30).ConfigureAwait(true);
+						windowToFocus.BringToTop();
 						windowToFocus.Focus();
 					}
 				}
+
+				CurrentSceneSelectionChanged?.Invoke(this, new CurrentSceneSelectionChangedEventArgs(prior, _current));
 			}
 			finally
 			{
@@ -261,16 +204,8 @@ namespace StageManager
 
 				if (targetScene.Equals(_current))
 				{
-					WindowStrategy.Show(window);
+					window.BringToTop();
 					window.Focus();
-				}
-				else
-				{
-					WindowStrategy.Hide(window);
-
-					if (window is WindowsWindow w && w.PopLastLocation() is IWindowLocation l)
-						Win32.SetWindowPos(window.Handle, IntPtr.Zero, l.X, l.Y, 0, 0,
-							Win32.SetWindowPosFlags.IgnoreResize);
 				}
 
 				return Task.CompletedTask;
@@ -281,9 +216,6 @@ namespace StageManager
 			}
 		}
 
-		// BUG FIX: Was marked async but contained no await - the compiler would wrap it
-		// in a state machine for no reason. Made synchronous and returns Task.CompletedTask
-		// after the await on the inner call. Now properly awaits MoveWindow internally.
 		public async Task MoveWindow(IntPtr handle, Scene targetScene)
 		{
 			var source = FindSceneForWindow(handle);
@@ -308,18 +240,13 @@ namespace StageManager
 
 		public IEnumerable<Scene> GetScenes()
 		{
-			// BUG FIX: Was lazily initializing here and returning - but if Start() fires
-			// events before this is first called, _scenes was null and event handlers crashed.
-			// Now _scenes is always initialized in the field declaration; we only populate
-			// it here if it's empty (first call).
 			if (_scenes.Count == 0)
 			{
-				var grouped = GetSceneableWindows()
-					.GroupBy(GetWindowGroupKey)
-					.Select(group => new Scene(group.Key, group.ToArray()))
+				var windows = GetSceneableWindows()
+					.Select(w => new Scene(GetWindowGroupKey(w), w))
 					.ToList();
 
-				_scenes.AddRange(grouped);
+				_scenes.AddRange(windows);
 			}
 
 			return _scenes;
@@ -328,6 +255,6 @@ namespace StageManager
 		public IEnumerable<IWindow> GetCurrentWindows()
 			=> _current?.Windows ?? GetSceneableWindows();
 
-		private string GetWindowGroupKey(IWindow window) => window.ProcessName;
+		private string GetWindowGroupKey(IWindow window) => window.Handle.ToString();
 	}
 }

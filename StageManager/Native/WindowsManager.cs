@@ -25,10 +25,6 @@ namespace StageManager.Native
 		private readonly object _mouseMoveLock = new object();
 		private Win32.HookProc _mouseHook = null!;
 
-		// BUG FIX: Store hook handles so we can properly unhook on Stop()
-		// The original Stop() only set _active = false but left all WinEvent hooks registered.
-		// This meant the hook callbacks kept firing on the OS thread even after "stop",
-		// and the mouse hook thread (Application.Run) was never terminated.
 		private readonly List<IntPtr> _winEventHooks = new();
 		private IntPtr _mouseHookHandle;
 		private Thread? _hookThread;
@@ -87,11 +83,11 @@ namespace StageManager.Native
 					currentProcess.MainModule!.BaseAddress,
 					0);
 
-				Application.Run(); // Pumps messages for the low-level mouse hook
+				Application.Run();
 			});
 
 			_hookThread.Name = "WindowsManager.HookThread";
-			_hookThread.IsBackground = true; // Don't keep the process alive just for this thread
+			_hookThread.IsBackground = true;
 			_hookThread.Start();
 
 			return Task.CompletedTask;
@@ -101,19 +97,15 @@ namespace StageManager.Native
 		{
 			_active = false;
 
-			// Unhook all WinEvent hooks (was completely missing before)
 			foreach (var hook in _winEventHooks)
 			{
-				try { Win32.UnhookWinEvent(hook); } catch { /* Best effort */ }
+				try { Win32.UnhookWinEvent(hook); } catch { }
 			}
 			_winEventHooks.Clear();
 
-			// Terminate the hook message pump thread
-			// Application.ExitThread() must be called from within that thread's context,
-			// so we post it. The thread is IsBackground so it won't block process exit anyway.
 			if (_hookThread is not null && _hookThread.IsAlive)
 			{
-				try { Application.ExitThread(); } catch { /* Best effort */ }
+				try { Application.ExitThread(); } catch { }
 			}
 		}
 

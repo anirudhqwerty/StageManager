@@ -1,7 +1,6 @@
 ﻿using StageManager.Native.Window;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace StageManager
@@ -55,7 +54,7 @@ namespace StageManager
 		public bool IsSelected
 		{
 			get => _selected;
-			set 
+			set
 			{
 				if (_selected != value)
 				{

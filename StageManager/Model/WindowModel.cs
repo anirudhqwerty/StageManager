@@ -13,7 +13,6 @@ namespace StageManager.Model
 	[System.Diagnostics.DebuggerDisplay("{Title}")]
 	public class WindowModel : INotifyPropertyChanged
 	{
-		//If you get 'dllimport unknown'-, then add 'using System.Runtime.InteropServices;'
 		[DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		public static extern bool DeleteObject([In] IntPtr hObject);
@@ -35,25 +34,10 @@ namespace StageManager.Model
 
 		public string Title => _window.Title.Length > 20 ? _window.Title.Substring(0, 17) + " ..." : _window.Title;
 
-		public ImageSource? ImageSourceFromBitmap(System.Drawing.Bitmap? bmp)
-		{
-			if (bmp is null)
-				return null;
-
-			var handle = bmp.GetHbitmap();
-			try
-			{
-				return Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-			}
-			finally { DeleteObject(handle); }
-		}
-
 		public static ImageSource? IconToImageSource(System.Drawing.Icon? icon)
 		{
 			if (icon is null)
 				return null;
-
-			//// TODO check memory leaks
 
 			var imageSource = Imaging.CreateBitmapSourceFromHIcon(
 				icon.Handle,
@@ -71,7 +55,6 @@ namespace StageManager.Model
 			set
 			{
 				_window = value;
-
 				RaisePropertyChanged();
 				RaisePropertyChanged(nameof(Title));
 				RaisePropertyChanged(nameof(Handle));

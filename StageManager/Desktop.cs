@@ -22,23 +22,17 @@ namespace StageManager
 
 		private const int WM_COMMAND = 0x111;
 		private IntPtr _desktopViewHandle;
-
-		// Cache desktop icon visibility - reading the registry on every overlap tick (every 500ms) is wasteful
 		private bool? _iconsVisibleCache;
 		private RegistryKey? _advancedKey;
 
 		public Desktop()
 		{
-			// Subscribe to registry changes so our cache stays valid
 			try
 			{
 				_advancedKey = Registry.CurrentUser.OpenSubKey(
 					@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", writable: false);
 			}
-			catch
-			{
-				// If we can't open the key, we'll just re-read each time
-			}
+			catch { }
 		}
 
 		public void TrySetDesktopView(IntPtr handle)
@@ -51,7 +45,6 @@ namespace StageManager
 
 		public bool GetDesktopIconsVisible()
 		{
-			// Use cached value when available - this is called frequently
 			if (_iconsVisibleCache.HasValue)
 				return _iconsVisibleCache.Value;
 
@@ -69,7 +62,7 @@ namespace StageManager
 				if (key?.GetValue("HideIcons", 0) is int hideIconsValue)
 					return hideIconsValue == 0;
 			}
-			catch { /* Fall through to default */ }
+			catch { }
 
 			return true;
 		}
@@ -78,7 +71,6 @@ namespace StageManager
 		{
 			var toggleDesktopCommand = new IntPtr(0x7402);
 			SendMessage(GetDesktopSHELLDLL_DefView(), WM_COMMAND, toggleDesktopCommand, IntPtr.Zero);
-			// Invalidate cache after toggling
 			_iconsVisibleCache = null;
 		}
 
@@ -100,10 +92,6 @@ namespace StageManager
 			}
 		}
 
-		/// <summary>
-		/// Call this to force a registry re-read on the next GetDesktopIconsVisible call.
-		/// Useful if something external may have changed the registry value.
-		/// </summary>
 		public void InvalidateIconVisibilityCache()
 		{
 			_iconsVisibleCache = null;
