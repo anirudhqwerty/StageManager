@@ -27,6 +27,8 @@ namespace StageManager
 
 		public WindowsManager WindowsManager { get; }
 
+		public bool IsSplitActive => _splitWindows.Count > 1;
+
 		public SceneManager(WindowsManager windowsManager)
 		{
 			WindowsManager = windowsManager ?? throw new ArgumentNullException(nameof(windowsManager));
@@ -95,12 +97,6 @@ namespace StageManager
 		private void WindowsManager_UntrackedFocus(object? sender, IntPtr e)
 		{
 			if (_suspend) return;
-
-			if (!_desktop.HasDesktopView)
-				_desktop.TrySetDesktopView(e);
-
-			if (_desktop.HasDesktopView && _desktop.DesktopViewHandle == e)
-				SwitchTo(null).SafeFireAndForget();
 		}
 
 		private void WindowsManager_WindowDestroyed(IWindow window)
@@ -173,7 +169,7 @@ namespace StageManager
 			}
 		}
 
-		public async Task AddToSplit(Scene scene)
+		public async Task ToggleSplit(Scene scene)
 		{
 			if (scene is null) return;
 
@@ -187,23 +183,48 @@ namespace StageManager
 						_splitWindows.Add(w);
 				}
 
-				foreach (var w in scene.Windows)
+				var sceneWindow = scene.Windows.FirstOrDefault();
+				if (sceneWindow is null) return;
+
+				var existing = _splitWindows.FindIndex(sw => sw.Handle == sceneWindow.Handle);
+				if (existing >= 0)
 				{
-					if (!_splitWindows.Any(sw => sw.Handle == w.Handle))
-						_splitWindows.Add(w);
+					_splitWindows.RemoveAt(existing);
+
+					if (_splitWindows.Count <= 1)
+					{
+						var remaining = _splitWindows.FirstOrDefault();
+						_splitWindows.Clear();
+
+						if (remaining is not null)
+						{
+							var remainingScene = FindSceneForWindow(remaining);
+							if (remainingScene is not null)
+							{
+								_suspend = false;
+								await SwitchTo(remainingScene);
+								return;
+							}
+						}
+						return;
+					}
+				}
+				else
+				{
+					foreach (var w in scene.Windows)
+					{
+						if (!_splitWindows.Any(sw => sw.Handle == w.Handle))
+							_splitWindows.Add(w);
+					}
 				}
 
 				foreach (var w in _splitWindows)
-				{
 					w.BringToTop();
-				}
+
+				await Task.Delay(50).ConfigureAwait(true);
 
 				var last = _splitWindows.LastOrDefault();
-				if (last is not null)
-				{
-					await Task.Delay(50).ConfigureAwait(true);
-					last.Focus();
-				}
+				last?.Focus();
 
 				WindowLayoutManager.SplitScreen(_splitWindows);
 			}

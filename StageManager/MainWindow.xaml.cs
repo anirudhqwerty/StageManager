@@ -27,6 +27,7 @@ namespace StageManager
 		private const string APP_NAME = "StageManager";
 		private IntPtr _thisHandle;
 		private TaskPoolGlobalHook? _hook;
+		private volatile bool _hookPaused;
 		private WindowMode _mode;
 		private double _lastWidth;
 		private Timer? _overlapCheckTimer;
@@ -45,10 +46,10 @@ namespace StageManager
 			SwitchSceneCommand = new ActionCommand(async model =>
 			{
 				var sceneModel = (SceneModel)model;
-				var isCtrlHeld = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+				var isCtrlHeld = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
 
 				if (isCtrlHeld)
-					await SceneManager!.AddToSplit(sceneModel.Scene!);
+					await SceneManager!.ToggleSplit(sceneModel.Scene!);
 				else
 					await SceneManager!.SwitchTo(sceneModel.Scene);
 			});
@@ -59,6 +60,7 @@ namespace StageManager
 			base.OnInitialized(e);
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 			_lastWidth = Width;
+			Mode = WindowMode.OffScreen;
 			StartHook();
 		}
 
@@ -135,7 +137,7 @@ namespace StageManager
 
 		private void SceneManager_SceneChanged(object? sender, SceneChangedEventArgs e)
 		{
-			this.Dispatcher.Invoke(() =>
+			this.Dispatcher.BeginInvoke(() =>
 			{
 				switch (e.Change)
 				{
@@ -163,6 +165,8 @@ namespace StageManager
 
 		private void OnMousePressed(object? sender, MouseHookEventArgs e)
 		{
+			if (_hookPaused) return;
+
 			if (EnableWindowDropToScene)
 				_overlapCheckTimer?.Change(TimeSpan.Zero, TimeSpan.Zero);
 
@@ -173,7 +177,7 @@ namespace StageManager
 			if (EnableWindowPullToScene)
 			{
 				var screenPoint = new Point(e.Data.X, e.Data.Y);
-				this.Dispatcher.Invoke(() =>
+				this.Dispatcher.BeginInvoke(() =>
 				{
 					_mouseDownScene = FindSceneByPoint(screenPoint);
 				});
@@ -182,6 +186,8 @@ namespace StageManager
 
 		private void OnMouseReleased(object? sender, MouseHookEventArgs e)
 		{
+			if (_hookPaused) return;
+
 			if (EnableWindowDropToScene)
 			{
 				_overlapCheckTimer?.Change(0, TIMERINTERVAL_MILLISECONDS);
@@ -192,7 +198,7 @@ namespace StageManager
 					return;
 
 				var screenPoint = new Point(e.Data.X, e.Data.Y);
-				this.Dispatcher.Invoke(() =>
+				this.Dispatcher.BeginInvoke(() =>
 				{
 					var sceneModel = FindSceneByPoint(screenPoint);
 					if (sceneModel is object)
@@ -204,7 +210,7 @@ namespace StageManager
 			{
 				if (e.Data.X > _lastWidth && _mouseDownScene is object)
 				{
-					this.Dispatcher.Invoke(() =>
+					this.Dispatcher.BeginInvoke(() =>
 					{
 						SceneManager?.PopWindowFrom(_mouseDownScene.Scene!).SafeFireAndForget();
 					});
@@ -288,6 +294,8 @@ namespace StageManager
 
 		private void StartHook()
 		{
+			if (_hook is not null) return;
+
 			_hook = new TaskPoolGlobalHook();
 			_hook.MousePressed += OnMousePressed;
 			_hook.MouseReleased += OnMouseReleased;
@@ -307,47 +315,33 @@ namespace StageManager
 			{
 				_hook.Dispose();
 			}
-			catch (HookException)
-			{
-			}
+			catch (HookException) { }
+
+			_hook = null;
 		}
 
 		private void _hook_MouseMoved(object? sender, MouseHookEventArgs e)
 		{
+			if (_hookPaused) return;
+
 			_mouse.X = e.Data.X;
 			_mouse.Y = e.Data.Y;
 
-			if (Mode == WindowMode.OffScreen && e.Data.X <= 6)
+			if (Mode == WindowMode.OffScreen && e.Data.X <= 2)
 			{
-				Dispatcher.Invoke(() => Mode = WindowMode.Flyover);
+				Dispatcher.BeginInvoke(() => Mode = WindowMode.Flyover);
+			}
+			else if (Mode == WindowMode.Flyover && e.Data.X > _lastWidth + 40)
+			{
+				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
 		}
 
 		private void OverlapCheck(object? _)
 		{
-			if (SceneManager is null) return;
-
-			var currentWindows = SceneManager.GetCurrentWindows().ToArray();
-			UpdateModeByWindows(currentWindows);
-		}
-
-		private void UpdateModeByWindows(IEnumerable<IWindow> windows)
-		{
-			bool doesOverlap(IWindowLocation loc) => loc.State == Native.Window.WindowState.Maximized || (loc.State == Native.Window.WindowState.Normal && (loc.X * 2) < _lastWidth);
-
-			var anyOverlappingWindows = windows.Any(w => doesOverlap(w.Location));
-
-			var containsMouse = _mouse.X <= _lastWidth;
-			var setMode = Mode == WindowMode.OnScreen && !containsMouse
-							|| Mode == WindowMode.OffScreen
-							|| (Mode == WindowMode.Flyover && !containsMouse);
-
-			if (setMode)
+			if (_mouse.X > _lastWidth + 40 && Mode == WindowMode.Flyover)
 			{
-				Dispatcher.Invoke(() =>
-				{
-					Mode = anyOverlappingWindows ? WindowMode.OffScreen : WindowMode.OnScreen;
-				});
+				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
 		}
 
@@ -369,9 +363,9 @@ namespace StageManager
 
 		private void MenuItem_Quit_Click(object sender, RoutedEventArgs e) => Close();
 
-		private void ContextMenu_Closed(object sender, RoutedEventArgs e) => StartHook();
+		private void ContextMenu_Closed(object sender, RoutedEventArgs e) => _hookPaused = false;
 
-		private void ContextMenu_Opened(object sender, RoutedEventArgs e) => StopHook();
+		private void ContextMenu_Opened(object sender, RoutedEventArgs e) => _hookPaused = true;
 	}
 
 	public enum WindowMode

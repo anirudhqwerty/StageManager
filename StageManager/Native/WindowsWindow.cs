@@ -209,13 +209,23 @@ namespace StageManager.Native
 		private static readonly HashSet<string> IgnoredClasses = new(StringComparer.OrdinalIgnoreCase)
 		{
 			"TaskManagerWindow", "MSCTFIME UI", "SHELLDLL_DefView",
-			"LockScreenBackstopFrame", "Progman", "Shell_TrayWnd", "WorkerW"
+			"LockScreenBackstopFrame", "Progman", "Shell_TrayWnd", "WorkerW",
+			"Windows.UI.Core.CoreWindow", "Shell_SecondaryTrayWnd",
+			"tooltips_class32", "#32770", "ForegroundStaging",
+			"Shell_InputSwitchTopLevelWindow", "Windows.Internal.Shell.TabProxyWindow",
+			"EdgeUiInputWndClass", "EdgeUiInputTopWndClass",
+			"MultitaskingViewFrame", "NativeHWNDHost", "TeachingTip",
+			"InputApp", "WindowsDashboard"
 		};
 
 		private static readonly HashSet<string> IgnoredProcesses = new(StringComparer.OrdinalIgnoreCase)
 		{
 			"SearchUI", "ShellExperienceHost", "PeopleExperienceHost", "LockApp",
-			"StartMenuExperienceHost", "SearchApp", "SearchHost", "search", "ScreenClippingHost"
+			"StartMenuExperienceHost", "SearchApp", "SearchHost", "search", "ScreenClippingHost",
+			"TextInputHost", "Widgets", "WidgetService", "SystemSettings",
+			"Video.UI", "NarratorQuickStart", "GameBar", "GameBarFTServer",
+			"CompPkgSrv", "svchost", "csrss", "dwm", "fontdrvhost",
+			"MicrosoftEdgeUpdate", "SecurityHealthSystray"
 		};
 
 		public bool IsCandidate()
@@ -223,6 +233,19 @@ namespace StageManager.Native
 			if (!CanLayout) return false;
 			if (IgnoredClasses.Contains(Class)) return false;
 			if (IgnoredProcesses.Contains(ProcessName)) return false;
+
+			var title = Title;
+			if (string.IsNullOrWhiteSpace(title)) return false;
+
+			Win32.Rect rect = new();
+			Win32.GetWindowRect(_handle, ref rect);
+			int w = rect.Right - rect.Left;
+			int h = rect.Bottom - rect.Top;
+			if (w <= 1 || h <= 1) return false;
+
+			if (string.IsNullOrEmpty(_processExecutable) && string.IsNullOrEmpty(ProcessName))
+				return false;
+
 			return true;
 		}
 
