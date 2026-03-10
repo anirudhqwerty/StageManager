@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using StageManager.Native.PInvoke;
 using System;
 using System.Runtime.InteropServices;
@@ -23,6 +23,24 @@ namespace StageManager
 		private const int WM_COMMAND = 0x111;
 		private IntPtr _desktopViewHandle;
 
+		// Cache desktop icon visibility - reading the registry on every overlap tick (every 500ms) is wasteful
+		private bool? _iconsVisibleCache;
+		private RegistryKey _advancedKey;
+
+		public Desktop()
+		{
+			// Subscribe to registry changes so our cache stays valid
+			try
+			{
+				_advancedKey = Registry.CurrentUser.OpenSubKey(
+					@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", writable: false);
+			}
+			catch
+			{
+				// If we can't open the key, we'll just re-read each time
+			}
+		}
+
 		public void TrySetDesktopView(IntPtr handle)
 		{
 			var buffer = new StringBuilder(255);
@@ -33,31 +51,62 @@ namespace StageManager
 
 		public bool GetDesktopIconsVisible()
 		{
-			// pinvoke suggestions from StackOverflow are not working reliably, so we read the registry directly
-			// https://stackoverflow.com/questions/6402834/how-to-hide-desktop-icons-programmatically
-			using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", writable: false);
-			if (key?.GetValue("HideIcons", 0) is int hideIconsValue)
-				return hideIconsValue == 0;
+			// Use cached value when available - this is called frequently
+			if (_iconsVisibleCache.HasValue)
+				return _iconsVisibleCache.Value;
 
-			return false;
+			_iconsVisibleCache = ReadDesktopIconsVisibleFromRegistry();
+			return _iconsVisibleCache.Value;
+		}
+
+		private bool ReadDesktopIconsVisibleFromRegistry()
+		{
+			try
+			{
+				var key = _advancedKey
+					?? Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", writable: false);
+
+				if (key?.GetValue("HideIcons", 0) is int hideIconsValue)
+					return hideIconsValue == 0;
+			}
+			catch { /* Fall through to default */ }
+
+			return true;
 		}
 
 		private void ToggleDesktopIcons()
 		{
 			var toggleDesktopCommand = new IntPtr(0x7402);
 			SendMessage(GetDesktopSHELLDLL_DefView(), WM_COMMAND, toggleDesktopCommand, IntPtr.Zero);
+			// Invalidate cache after toggling
+			_iconsVisibleCache = null;
 		}
 
 		public void ShowIcons()
 		{
 			if (!GetDesktopIconsVisible())
+			{
 				ToggleDesktopIcons();
+				_iconsVisibleCache = true;
+			}
 		}
 
 		public void HideIcons()
 		{
 			if (GetDesktopIconsVisible())
+			{
 				ToggleDesktopIcons();
+				_iconsVisibleCache = false;
+			}
+		}
+
+		/// <summary>
+		/// Call this to force a registry re-read on the next GetDesktopIconsVisible call.
+		/// Useful if something external may have changed the registry value.
+		/// </summary>
+		public void InvalidateIconVisibilityCache()
+		{
+			_iconsVisibleCache = null;
 		}
 
 		static IntPtr GetDesktopSHELLDLL_DefView()
@@ -68,17 +117,12 @@ namespace StageManager
 			var hProgman = FindWindow("Progman", "Program Manager");
 			var hDesktopWnd = GetDesktopWindow();
 
-			// If the main Program Manager window is found
 			if (hProgman != IntPtr.Zero)
 			{
-				// Get and load the main List view window containing the icons.
 				hShellViewWin = FindWindowEx(hProgman, IntPtr.Zero, "SHELLDLL_DefView", null);
 
 				if (hShellViewWin == IntPtr.Zero)
 				{
-					// When this fails (picture rotation is turned ON, toggledesktop shell cmd used ), then look for the WorkerW windows list to get the
-					// correct desktop list handle.
-					// As there can be multiple WorkerW windows, iterate through all to get the correct one
 					do
 					{
 						hWorkerW = FindWindowEx(hDesktopWnd, hWorkerW, "WorkerW", null);
@@ -90,7 +134,6 @@ namespace StageManager
 		}
 
 		public bool HasDesktopView => _desktopViewHandle != IntPtr.Zero;
-
 		public IntPtr DesktopViewHandle => _desktopViewHandle;
 	}
 }
