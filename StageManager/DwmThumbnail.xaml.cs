@@ -18,7 +18,7 @@ namespace StageManager
 		}
 
 		private IntPtr _dwmThumbnail;
-		private Window _window;
+		private Window? _window;
 		private Point? _dpiScaleFactor;
 
 		public static readonly DependencyProperty PreviewHandleProperty = DependencyProperty.Register(nameof(PreviewHandle),
@@ -81,23 +81,29 @@ namespace StageManager
 
 		private void StartCapture()
 		{
-			var windowHandle = new System.Windows.Interop.WindowInteropHelper(FindWindow()).Handle;
+			var window = FindWindow();
+			if (window is null) return;
+
+			var windowHandle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
 
 			var hr = NativeMethods.DwmRegisterThumbnail(windowHandle, PreviewHandle, out _dwmThumbnail);
 			if (hr != 0)
 				return;
 		}
 
-		private Window FindWindow() => _window ??= Window.GetWindow(this);
+		private Window? FindWindow() => _window ??= Window.GetWindow(this);
 
 		private void UpdateThumbnailProperties()
 		{
 			if (_dwmThumbnail == IntPtr.Zero)
 				return;
 
+			var window = FindWindow();
+			if (window is null) return;
+
 			var dpi = GetDpiScaleFactor();
 
-			var previewBounds = BoundsRelativeTo(this, FindWindow());
+			var previewBounds = BoundsRelativeTo(this, window);
 
 			var thumbnailRect = new RECT
 			{

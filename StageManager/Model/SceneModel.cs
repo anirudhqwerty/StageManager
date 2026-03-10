@@ -8,9 +8,9 @@ namespace StageManager.Model
 	[System.Diagnostics.DebuggerDisplay("{Title}")]
 	public class SceneModel : INotifyPropertyChanged
 	{
-		public event PropertyChangedEventHandler PropertyChanged;
+		public event PropertyChangedEventHandler? PropertyChanged;
 		private bool _isVisible;
-		private Scene _scene;
+		private Scene? _scene;
 
 		public static SceneModel FromScene(Scene scene)
 		{
@@ -52,7 +52,7 @@ namespace StageManager.Model
 					}
 					else
 					{
-						// no window tp update --> add/insert
+						// no window to update --> add/insert
 						Windows.Insert(i, new WindowModel(updatedWindows[i]));
 					}
 				}
@@ -78,7 +78,7 @@ namespace StageManager.Model
 
 		public Guid Id { get; set; }
 
-		public Scene Scene
+		public Scene? Scene
 		{
 			get => _scene;
 			private set

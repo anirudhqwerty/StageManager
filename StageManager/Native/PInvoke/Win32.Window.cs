@@ -32,6 +32,10 @@ namespace StageManager.Native.PInvoke
         [DllImport("user32.dll", EntryPoint = "EnumWindows", ExactSpelling = false, CharSet = CharSet.Auto, SetLastError = true)]
         public static extern bool EnumWindows(EnumDelegate lpEnumCallbackFunction, IntPtr lParam);
 
+        [DllImport("user32.dll", EntryPoint = "EnumChildWindows", ExactSpelling = false, CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool EnumChildWindows(IntPtr hWndParent, EnumDelegate lpEnumFunc, IntPtr lParam);
+
         [DllImport("user32.dll", EntryPoint = "GetWindowText", ExactSpelling = false, CharSet = CharSet.Auto, SetLastError = true)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpWindowText, int nMaxCount);
 

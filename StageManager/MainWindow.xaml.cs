@@ -25,17 +25,17 @@ namespace StageManager
 	/// </summary>
 	public partial class MainWindow : Window
 	{
-		private const int TIMERINTERVAL_MILLISECONDS = 500;
+		private const int TIMERINTERVAL_MILLISECONDS = 300;
 		private const int MAX_SCENES = 6;
 		private const string APP_NAME = "StageManager";
 		private IntPtr _thisHandle;
-		private TaskPoolGlobalHook _hook;
+		private TaskPoolGlobalHook? _hook;
 		private WindowMode _mode;
 		private double _lastWidth;
-		private Timer _overlapCheckTimer;
+		private Timer? _overlapCheckTimer;
 		private Point _mouse = new Point(0, 0);
-		private SceneModel _removedCurrentScene;
-		private SceneModel _mouseDownScene;
+		private SceneModel? _removedCurrentScene;
+		private SceneModel? _mouseDownScene;
 
 		public bool EnableWindowDropToScene = false;
 		public bool EnableWindowPullToScene = true;
@@ -67,7 +67,7 @@ namespace StageManager
 
 			trayIcon.Dispose();
 
-			SceneManager.Stop();
+			SceneManager?.Stop();
 
 			base.OnClosed(e);
 
@@ -97,7 +97,7 @@ namespace StageManager
 
 		private void AddInitialScenes()
 		{
-			var initialScenes = SceneManager.GetScenes().ToArray();
+			var initialScenes = SceneManager!.GetScenes().ToArray();
 			for (int i = 0; i < initialScenes.Length; i++)
 			{
 				var model = SceneModel.FromScene(initialScenes[i]);
@@ -138,7 +138,7 @@ namespace StageManager
 			this.Height = area.Height;
 		}
 
-		private void SceneManager_SceneChanged(object sender, SceneChangedEventArgs e)
+		private void SceneManager_SceneChanged(object? sender, SceneChangedEventArgs e)
 		{
 			this.Dispatcher.Invoke(() =>
 			{
@@ -170,7 +170,7 @@ namespace StageManager
 		{
 			// if it's allowed to drag windows into scenes, we cannot hide the scenes
 			if (EnableWindowDropToScene)
-				_overlapCheckTimer.Change(TimeSpan.Zero, TimeSpan.Zero);
+				_overlapCheckTimer?.Change(TimeSpan.Zero, TimeSpan.Zero);
 
 			var foregroundWindow = Win32.GetForegroundWindow();
 			if (foregroundWindow != _thisHandle)
@@ -191,7 +191,7 @@ namespace StageManager
 			// if it's allowed to drag windows into scenes, we cannot hide the scenes
 			if (EnableWindowDropToScene)
 			{
-				_overlapCheckTimer.Change(0, TIMERINTERVAL_MILLISECONDS);
+				_overlapCheckTimer?.Change(0, TIMERINTERVAL_MILLISECONDS);
 
 				var foregroundWindow = Win32.GetForegroundWindow();
 
@@ -204,7 +204,7 @@ namespace StageManager
 					var sceneModel = FindSceneByPoint(screenPoint);
 
 					if (sceneModel is object)
-						SceneManager.MoveWindow(foregroundWindow, sceneModel.Scene).SafeFireAndForget();
+						SceneManager?.MoveWindow(foregroundWindow, sceneModel.Scene!).SafeFireAndForget();
 				});
 			}
 
@@ -214,13 +214,13 @@ namespace StageManager
 				{
 					this.Dispatcher.Invoke(() =>
 					{
-						SceneManager.PopWindowFrom(_mouseDownScene.Scene).SafeFireAndForget();
+						SceneManager?.PopWindowFrom(_mouseDownScene.Scene!).SafeFireAndForget();
 					});
 				}
 			}
 		}
 
-		private SceneModel FindSceneByPoint(Point p)
+		private SceneModel? FindSceneByPoint(Point p)
 		{
 			var thisWindow = new WindowsWindow(_thisHandle);
 			var pointOnWindow = new Point(p.X - thisWindow.Location.X, p.Y - thisWindow.Location.Y);
@@ -230,7 +230,7 @@ namespace StageManager
 			pointOnWindow.X /= dpi.DpiScaleX;
 			pointOnWindow.Y /= dpi.DpiScaleY;
 
-			SceneModel model = null;
+			SceneModel? model = null;
 
 			var element = VisualTreeHelper.HitTest(this, pointOnWindow)?.VisualHit;
 
@@ -256,11 +256,11 @@ namespace StageManager
 
 		public ObservableCollection<SceneModel> Scenes { get; } = new ObservableCollection<SceneModel>();
 
-		public IEnumerable<SceneModel> AllScenes => Scenes.Union(new[] { _removedCurrentScene });
+		public IEnumerable<SceneModel> AllScenes => Scenes.Union(new[] { _removedCurrentScene! }).Where(s => s is not null);
 
 		public ICommand SwitchSceneCommand { get; }
 
-		public SceneManager SceneManager { get; private set; }
+		public SceneManager? SceneManager { get; private set; }
 
 		public IntPtr Handle => _thisHandle;
 
@@ -290,8 +290,8 @@ namespace StageManager
 			var easingMode = isIncoming ? EasingMode.EaseOut : EasingMode.EaseIn;
 
 			var animation = new DoubleAnimationUsingKeyFrames();
-			animation.Duration = new Duration(TimeSpan.FromSeconds(0.5));
-			var easingFunction = new PowerEase { EasingMode = easingMode };
+			animation.Duration = new Duration(TimeSpan.FromMilliseconds(300));
+			var easingFunction = new CubicEase { EasingMode = easingMode };
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(Left, KeyTime.FromPercent(0)));
 			animation.KeyFrames.Add(new EasingDoubleKeyFrame(newLeft, KeyTime.FromPercent(1.0), easingFunction));
 
@@ -311,6 +311,8 @@ namespace StageManager
 
 		private void StopHook()
 		{
+			if (_hook is null) return;
+
 			_hook.MousePressed -= OnMousePressed;
 			_hook.MouseReleased -= OnMouseReleased;
 			_hook.MouseMoved -= _hook_MouseMoved;
@@ -329,7 +331,7 @@ namespace StageManager
 			_mouse.X = e.Data.X;
 			_mouse.Y = e.Data.Y;
 
-			if (Mode == WindowMode.OffScreen && e.Data.X <= 44)
+			if (Mode == WindowMode.OffScreen && e.Data.X <= 8)
 			{
 				Dispatcher.Invoke(() => Mode = WindowMode.Flyover);
 			}
@@ -337,6 +339,8 @@ namespace StageManager
 
 		private void OverlapCheck(object? _)
 		{
+			if (SceneManager is null) return;
+
 			var currentWindows = SceneManager.GetCurrentWindows().ToArray(); // in case the enumeration changes
 			UpdateModeByWindows(currentWindows);
 		}

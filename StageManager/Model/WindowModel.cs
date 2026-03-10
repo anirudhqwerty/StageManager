@@ -18,10 +18,10 @@ namespace StageManager.Model
 		[return: MarshalAs(UnmanagedType.Bool)]
 		public static extern bool DeleteObject([In] IntPtr hObject);
 
-		private IWindow _window;
-		private ImageSource _iconSource;
+		private IWindow _window = null!;
+		private ImageSource? _iconSource;
 
-		public event PropertyChangedEventHandler PropertyChanged;
+		public event PropertyChangedEventHandler? PropertyChanged;
 
 		public WindowModel(IWindow window)
 		{
@@ -35,7 +35,7 @@ namespace StageManager.Model
 
 		public string Title => _window.Title.Length > 20 ? _window.Title.Substring(0, 17) + " ..." : _window.Title;
 
-		public ImageSource ImageSourceFromBitmap(System.Drawing.Bitmap bmp)
+		public ImageSource? ImageSourceFromBitmap(System.Drawing.Bitmap? bmp)
 		{
 			if (bmp is null)
 				return null;
@@ -48,14 +48,12 @@ namespace StageManager.Model
 			finally { DeleteObject(handle); }
 		}
 
-		public static ImageSource IconToImageSource(System.Drawing.Icon icon)
+		public static ImageSource? IconToImageSource(System.Drawing.Icon? icon)
 		{
 			if (icon is null)
 				return null;
 
 			//// TODO check memory leaks
-
-			var bmp = System.Drawing.Bitmap.FromHicon(icon.Handle);
 
 			var imageSource = Imaging.CreateBitmapSourceFromHIcon(
 				icon.Handle,
@@ -63,23 +61,9 @@ namespace StageManager.Model
 				BitmapSizeOptions.FromEmptyOptions());
 
 			return imageSource;
-
-			// Alternativ - vergleichen
-
-			//using (var stream = new MemoryStream())
-			//{
-			//	icon.ToBitmap().Save(stream, ImageFormat.Png);
-			//	var bitmapImage = new BitmapImage();
-			//	bitmapImage.BeginInit();
-			//	bitmapImage.StreamSource = new MemoryStream(stream.ToArray());
-			//	bitmapImage.EndInit();
-			//	bitmapImage.Freeze();
-
-			//	return bitmapImage;
-			//}
 		}
 
-		public ImageSource Icon => _iconSource ??= IconToImageSource((Window as WindowsWindow).ExtractIcon());
+		public ImageSource? Icon => _iconSource ??= IconToImageSource((Window as WindowsWindow)?.ExtractIcon());
 
 		public IWindow Window
 		{

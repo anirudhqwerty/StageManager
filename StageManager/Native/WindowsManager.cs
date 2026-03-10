@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -17,12 +18,12 @@ namespace StageManager.Native
 	public class WindowsManager : IWindowsManager
 	{
 		private bool _active;
-		private IDictionary<IntPtr, WindowsWindow> _windows;
+		private ConcurrentDictionary<IntPtr, WindowsWindow> _windows;
 		private WinEventDelegate _hookDelegate;
 
 		private WindowsWindow? _mouseMoveWindow;
 		private readonly object _mouseMoveLock = new object();
-		private Win32.HookProc _mouseHook;
+		private Win32.HookProc _mouseHook = null!;
 
 		// BUG FIX: Store hook handles so we can properly unhook on Stop()
 		// The original Stop() only set _active = false but left all WinEvent hooks registered.
@@ -49,7 +50,7 @@ namespace StageManager.Native
 
 		public WindowsManager()
 		{
-			_windows = new Dictionary<IntPtr, WindowsWindow>();
+			_windows = new ConcurrentDictionary<IntPtr, WindowsWindow>();
 			_floating = new Dictionary<WindowsWindow, bool>();
 			_hookDelegate = new WinEventDelegate(WindowHook);
 		}
@@ -221,9 +222,7 @@ namespace StageManager.Native
 					window.WindowUpdated += sender => HandleWindowUpdated(sender);
 					window.WindowClosed += sender => HandleWindowClosed(sender);
 
-					_windows[handle] = window;
-
-					if (emitEvent)
+					if (_windows.TryAdd(handle, window) && emitEvent)
 						HandleWindowAdd(window, true);
 				}
 			}
@@ -233,10 +232,8 @@ namespace StageManager.Native
 		{
 			if (!_active) return;
 
-			if (_windows.ContainsKey(handle))
+			if (_windows.TryRemove(handle, out var window))
 			{
-				var window = _windows[handle];
-				_windows.Remove(handle);
 				HandleWindowRemove(window);
 			}
 		}
@@ -245,25 +242,24 @@ namespace StageManager.Native
 		{
 			if (!_active) return;
 
-			if (type == WindowUpdateType.Show && _windows.ContainsKey(handle))
+			if (type == WindowUpdateType.Show && _windows.TryGetValue(handle, out var showWindow))
 			{
-				WindowUpdated?.Invoke(_windows[handle], type);
+				WindowUpdated?.Invoke(showWindow, type);
 			}
 			else if (type == WindowUpdateType.Show)
 			{
 				RegisterWindow(handle);
 			}
-			else if (type == WindowUpdateType.Hide && _windows.ContainsKey(handle))
+			else if (type == WindowUpdateType.Hide && _windows.TryGetValue(handle, out var hideWindow))
 			{
-				var window = _windows[handle];
-				if (!window.DidManualHide)
+				if (!hideWindow.DidManualHide)
 					UnregisterWindow(handle);
 				else
-					WindowUpdated?.Invoke(window, type);
+					WindowUpdated?.Invoke(hideWindow, type);
 			}
-			else if (_windows.ContainsKey(handle))
+			else if (_windows.TryGetValue(handle, out var otherWindow))
 			{
-				WindowUpdated?.Invoke(_windows[handle], type);
+				WindowUpdated?.Invoke(otherWindow, type);
 			}
 			else
 			{
@@ -273,9 +269,8 @@ namespace StageManager.Native
 
 		private void StartWindowMove(IntPtr handle)
 		{
-			if (!_active || !_windows.ContainsKey(handle)) return;
+			if (!_active || !_windows.TryGetValue(handle, out var window)) return;
 
-			var window = _windows[handle];
 			window.StoreLastLocation();
 			HandleWindowMoveStart(window);
 			WindowUpdated?.Invoke(window, WindowUpdateType.MoveStart);
@@ -283,9 +278,8 @@ namespace StageManager.Native
 
 		private void EndWindowMove(IntPtr handle)
 		{
-			if (!_active || !_windows.ContainsKey(handle)) return;
+			if (!_active || !_windows.TryGetValue(handle, out var window)) return;
 
-			var window = _windows[handle];
 			HandleWindowMoveEnd();
 			WindowUpdated?.Invoke(window, WindowUpdateType.MoveEnd);
 		}
@@ -294,9 +288,8 @@ namespace StageManager.Native
 		{
 			if (!_active) return;
 
-			if (_mouseMoveWindow != null && _windows.ContainsKey(handle))
+			if (_mouseMoveWindow != null && _windows.TryGetValue(handle, out var window))
 			{
-				var window = _windows[handle];
 				if (_mouseMoveWindow == window)
 					WindowUpdated?.Invoke(window, WindowUpdateType.Move);
 			}
