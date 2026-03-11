@@ -47,21 +47,24 @@ namespace StageManager
         protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
         {
             base.OnRenderSizeChanged(sizeInfo);
-            this.Top = 0;
-            this.Height = SystemParameters.WorkArea.Height;
+            // Center vertically on screen
+            this.Top = (SystemParameters.WorkArea.Height - this.Height) / 2;
             ApplyWindowMode();
         }
 
         private void ApplyWindowMode()
         {
             var screenWidth = SystemParameters.PrimaryScreenWidth;
+            // Center vertically
+            this.Top = (SystemParameters.WorkArea.Height - this.Height) / 2;
+
             var newLeft = Mode == WindowMode.OffScreen ? screenWidth : (screenWidth - Width);
 
             if (Left == newLeft) return;
 
             var easingMode = Mode == WindowMode.Flyover ? EasingMode.EaseOut : EasingMode.EaseIn;
             var animation = new DoubleAnimationUsingKeyFrames();
-            animation.Duration = new Duration(TimeSpan.FromMilliseconds(220));
+            animation.Duration = new Duration(TimeSpan.FromMilliseconds(250));
             animation.KeyFrames.Add(new EasingDoubleKeyFrame(Left, KeyTime.FromPercent(0)));
             animation.KeyFrames.Add(new EasingDoubleKeyFrame(newLeft, KeyTime.FromPercent(1.0), new CircleEase { EasingMode = easingMode }));
 

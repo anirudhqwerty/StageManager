@@ -45,24 +45,30 @@ namespace StageManager
         protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
         {
             base.OnRenderSizeChanged(sizeInfo);
-            this.Top = 0; // Fixes the window to the top right
+            // Center horizontally on screen
+            this.Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
             ApplyWindowMode();
         }
 
         private void ApplyWindowMode()
         {
-            var screenWidth = SystemParameters.PrimaryScreenWidth;
-            var newLeft = Mode == WindowMode.OffScreen ? screenWidth : (screenWidth - Width);
+            // Center horizontally on screen
+            this.Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
 
-            if (Left == newLeft) return;
+            // Slide from the TOP: OffScreen = above screen, Flyover = flush at top
+            var newTop = Mode == WindowMode.OffScreen ? -Height : 0;
+
+            var currentTop = Top;
+            if (double.IsNaN(currentTop)) currentTop = -Height;
+            if (Math.Abs(currentTop - newTop) < 1) return;
 
             var easingMode = Mode == WindowMode.Flyover ? EasingMode.EaseOut : EasingMode.EaseIn;
             var animation = new DoubleAnimationUsingKeyFrames();
-            animation.Duration = new Duration(TimeSpan.FromMilliseconds(220));
-            animation.KeyFrames.Add(new EasingDoubleKeyFrame(Left, KeyTime.FromPercent(0)));
-            animation.KeyFrames.Add(new EasingDoubleKeyFrame(newLeft, KeyTime.FromPercent(1.0), new CircleEase { EasingMode = easingMode }));
+            animation.Duration = new Duration(TimeSpan.FromMilliseconds(250));
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(currentTop, KeyTime.FromPercent(0)));
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(newTop, KeyTime.FromPercent(1.0), new CircleEase { EasingMode = easingMode }));
 
-            BeginAnimation(LeftProperty, animation);
+            BeginAnimation(TopProperty, animation);
         }
 
         private void ApplyMicaBackdrop()

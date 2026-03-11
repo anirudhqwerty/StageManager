@@ -32,14 +32,14 @@ namespace StageManager
 		private Point _mouse = new Point(0, 0);
 		private SceneModel? _removedCurrentScene;
 		private SceneModel? _mouseDownScene;
-		private TodoListWindow? _todoWindow;
-		private NotesWindow? _notesWindow;
+		private WorkflowPanel? _workflowPanel;
 
-		// Cached values for the hook thread (avoids querying WPF DependencyProperties and WinForms from the thread pool)
+		// Cached values for the hook thread
 		private int _cachedPhysicalScreenWidth;
-		private double _cachedTodoWidth = 300;
-		private double _cachedNotesWidth = 320;
-		private double _cachedNotesHeight = 400;
+		private int _cachedPhysicalScreenHeight;
+		private double _cachedPanelWidth = 360;
+		private double _cachedPanelHeight = 660;
+		private double _cachedPanelTop = 50;
 
 		public bool EnableWindowDropToScene = false;
 		public bool EnableWindowPullToScene = true;
@@ -67,8 +67,10 @@ namespace StageManager
 			_lastWidth = Width;
 			Mode = WindowMode.OffScreen;
 
-			// Cache the physical screen width once at startup
-			_cachedPhysicalScreenWidth = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width;
+			// Cache physical screen dimensions once at startup
+			var primaryScreen = System.Windows.Forms.Screen.PrimaryScreen;
+			_cachedPhysicalScreenWidth = primaryScreen.Bounds.Width;
+			_cachedPhysicalScreenHeight = primaryScreen.Bounds.Height;
 
 			ApplyMicaBackdrop();
 			StartHook();
@@ -103,15 +105,12 @@ namespace StageManager
 			base.OnContentRendered(e);
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
-			// Instantiate the right-edge flyover windows
-			_todoWindow = new TodoListWindow();
-			_todoWindow.Show();
-			_cachedTodoWidth = _todoWindow.Width;
-
-			_notesWindow = new NotesWindow();
-			_notesWindow.Show();
-			_cachedNotesWidth = _notesWindow.Width;
-			_cachedNotesHeight = _notesWindow.Height;
+			// Instantiate the workflow panel
+			_workflowPanel = new WorkflowPanel();
+			_workflowPanel.Show();
+			_cachedPanelWidth = _workflowPanel.Width;
+			_cachedPanelHeight = _workflowPanel.Height;
+			_cachedPanelTop = _workflowPanel.Top;
 
 			var windowsManager = new WindowsManager();
 			SceneManager = new SceneManager(windowsManager);
@@ -357,8 +356,11 @@ namespace StageManager
 			_mouse.X = e.Data.X;
 			_mouse.Y = e.Data.Y;
 
-			// --- LEFT SCREEN EDGE (Existing StageManager logic) ---
-			if (Mode == WindowMode.OffScreen && e.Data.X <= 2)
+			// --- LEFT CENTER (StageManager) ---
+			var sh = _cachedPhysicalScreenHeight;
+			bool isLeftCenter = e.Data.X <= 1 && e.Data.Y > sh / 3 && e.Data.Y < 2 * sh / 3;
+
+			if (Mode == WindowMode.OffScreen && isLeftCenter)
 			{
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.Flyover);
 			}
@@ -367,46 +369,27 @@ namespace StageManager
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
 
-			// --- RIGHT SCREEN EDGE & TOP RIGHT CORNER (New Logic) ---
-			// Skip if windows aren't initialized yet
-			if (_todoWindow is null || _notesWindow is null) return;
+			// --- RIGHT EDGE (Workflow Panel) ---
+			if (_workflowPanel is null) return;
 
-			// Use cached values — never access WPF DependencyProperties or WinForms from the hook thread
 			var sw = _cachedPhysicalScreenWidth;
+			bool isRightEdge = e.Data.X >= sw - 1;
 
-			bool isTopRightCorner = e.Data.X >= sw - 2 && e.Data.Y <= 5;
-			bool isRightEdge = e.Data.X >= sw - 2 && e.Data.Y > 5;
-
-			// Open Notes (Top Right)
-			if (isTopRightCorner && _notesWindow.Mode == WindowMode.OffScreen)
+			// Open panel
+			if (isRightEdge && _workflowPanel.Mode == WindowMode.OffScreen)
 			{
-				Dispatcher.BeginInvoke(() =>
-				{
-					_todoWindow.Mode = WindowMode.OffScreen; // Close To-Do if open
-					_notesWindow.Mode = WindowMode.Flyover;
-				});
-			}
-			// Open To-Do List (Right Edge)
-			else if (isRightEdge && _todoWindow.Mode == WindowMode.OffScreen && _notesWindow.Mode == WindowMode.OffScreen)
-			{
-				Dispatcher.BeginInvoke(() => _todoWindow.Mode = WindowMode.Flyover);
+				Dispatcher.BeginInvoke(() => _workflowPanel.Mode = WindowMode.Flyover);
 			}
 
-			// Hide Logic for Notes Window
-			if (_notesWindow.Mode == WindowMode.Flyover)
+			// Dismiss when mouse leaves the panel bounding box
+			if (_workflowPanel.Mode == WindowMode.Flyover)
 			{
-				if (e.Data.X < sw - _cachedNotesWidth - 40 || e.Data.Y > _cachedNotesHeight + 40)
+				var panelLeft = sw - _cachedPanelWidth;
+				if (e.Data.X < panelLeft - 50 ||
+					e.Data.Y < _cachedPanelTop - 30 ||
+					e.Data.Y > _cachedPanelTop + _cachedPanelHeight + 30)
 				{
-					Dispatcher.BeginInvoke(() => _notesWindow.Mode = WindowMode.OffScreen);
-				}
-			}
-
-			// Hide Logic for To-Do Window
-			if (_todoWindow.Mode == WindowMode.Flyover)
-			{
-				if (e.Data.X < sw - _cachedTodoWidth - 40)
-				{
-					Dispatcher.BeginInvoke(() => _todoWindow.Mode = WindowMode.OffScreen);
+					Dispatcher.BeginInvoke(() => _workflowPanel.Mode = WindowMode.OffScreen);
 				}
 			}
 		}
