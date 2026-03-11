@@ -32,14 +32,9 @@ namespace StageManager
 		private Point _mouse = new Point(0, 0);
 		private SceneModel? _removedCurrentScene;
 		private SceneModel? _mouseDownScene;
-		private WorkflowPanel? _workflowPanel;
 
 		// Cached values for the hook thread
-		private int _cachedPhysicalScreenWidth;
 		private int _cachedPhysicalScreenHeight;
-		private double _cachedPanelWidth = 360;
-		private double _cachedPanelHeight = 660;
-		private double _cachedPanelTop = 50;
 
 		public bool EnableWindowDropToScene = false;
 		public bool EnableWindowPullToScene = true;
@@ -69,7 +64,6 @@ namespace StageManager
 
 			// Cache physical screen dimensions once at startup
 			var primaryScreen = System.Windows.Forms.Screen.PrimaryScreen;
-			_cachedPhysicalScreenWidth = primaryScreen.Bounds.Width;
 			_cachedPhysicalScreenHeight = primaryScreen.Bounds.Height;
 
 			ApplyMicaBackdrop();
@@ -104,13 +98,6 @@ namespace StageManager
 		{
 			base.OnContentRendered(e);
 			_thisHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-
-			// Instantiate the workflow panel
-			_workflowPanel = new WorkflowPanel();
-			_workflowPanel.Show();
-			_cachedPanelWidth = _workflowPanel.Width;
-			_cachedPanelHeight = _workflowPanel.Height;
-			_cachedPanelTop = _workflowPanel.Top;
 
 			var windowsManager = new WindowsManager();
 			SceneManager = new SceneManager(windowsManager);
@@ -369,29 +356,7 @@ namespace StageManager
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
 
-			// --- RIGHT EDGE (Workflow Panel) ---
-			if (_workflowPanel is null) return;
 
-			var sw = _cachedPhysicalScreenWidth;
-			bool isRightEdge = e.Data.X >= sw - 1;
-
-			// Open panel
-			if (isRightEdge && _workflowPanel.Mode == WindowMode.OffScreen)
-			{
-				Dispatcher.BeginInvoke(() => _workflowPanel.Mode = WindowMode.Flyover);
-			}
-
-			// Dismiss when mouse leaves the panel bounding box
-			if (_workflowPanel.Mode == WindowMode.Flyover)
-			{
-				var panelLeft = sw - _cachedPanelWidth;
-				if (e.Data.X < panelLeft - 50 ||
-					e.Data.Y < _cachedPanelTop - 30 ||
-					e.Data.Y > _cachedPanelTop + _cachedPanelHeight + 30)
-				{
-					Dispatcher.BeginInvoke(() => _workflowPanel.Mode = WindowMode.OffScreen);
-				}
-			}
 		}
 
 		private void NavigateToProjectPage()
