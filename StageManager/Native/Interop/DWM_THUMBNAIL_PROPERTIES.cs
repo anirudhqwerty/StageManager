@@ -18,6 +18,7 @@ namespace StageManager.Native.Interop
         [MarshalAs(UnmanagedType.Bool)]
         public bool fVisible;
 
+        [MarshalAs(UnmanagedType.Bool)]
         public bool fSourceClientAreaOnly;
     }
 }

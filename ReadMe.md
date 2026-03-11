@@ -46,7 +46,7 @@ This is an experimental fun project. I don't have any idea whether or not this i
 |start with Windows|✅|
 |**Product stage**||
 |virtual desktop support (pin window)|⬜|
-|multi-monitor support|⬜|
+|multi-monitor support|✅|
 |visual feedback when dragging windows from other scenes|⬜|
 |feature parity with macOS Stage Manager|⬜|
 |**Polishing stage**||

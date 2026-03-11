@@ -129,14 +129,15 @@ namespace StageManager
 
 			var dpi = GetDpiScaleFactor();
 
-			var previewBounds = BoundsRelativeTo(this, window);
+			var topLeft = TransformToVisual(window).Transform(new Point(0, 0));
+			var bottomRight = TransformToVisual(window).Transform(new Point(ActualWidth, ActualHeight));
 
 			var thumbnailRect = new RECT
 			{
-				top = (int)(previewBounds.Top * dpi.Y),
-				left = (int)(previewBounds.Left * dpi.X),
-				bottom = (int)((previewBounds.Bottom - Margin.Top - Margin.Bottom) * dpi.Y) + 1,
-				right = (int)((previewBounds.Right - Margin.Left - Margin.Right) * dpi.X) + 1
+				top = (int)Math.Round(topLeft.Y * dpi.Y),
+				left = (int)Math.Round(topLeft.X * dpi.X),
+				bottom = (int)Math.Round(bottomRight.Y * dpi.Y),
+				right = (int)Math.Round(bottomRight.X * dpi.X)
 			};
 
 			var props = new DWM_THUMBNAIL_PROPERTIES
