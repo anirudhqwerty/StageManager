@@ -1,6 +1,5 @@
 using AsyncAwaitBestPractices;
 using StageManager.Native;
-using StageManager.Native.PInvoke;
 using StageManager.Native.Window;
 using StageManager.Strategies;
 using System;
@@ -14,11 +13,13 @@ namespace StageManager
 	public class SceneManager
 	{
 		private readonly Desktop _desktop;
-		private List<Scene> _scenes = new();
-		private Scene? _current;
-		private volatile bool _suspend = false;
-
+		private readonly List<Scene> _scenes = new();
 		private readonly List<IWindow> _splitWindows = new();
+		private Scene? _current;
+
+		private readonly SemaphoreSlim _transitionLock = new SemaphoreSlim(1, 1);
+		private readonly object _stateLock = new object();
+		private SynchronizationContext? _syncContext;
 
 		public event EventHandler<SceneChangedEventArgs>? SceneChanged;
 		public event EventHandler<CurrentSceneSelectionChangedEventArgs>? CurrentSceneSelectionChanged;
@@ -27,7 +28,10 @@ namespace StageManager
 
 		public WindowsManager WindowsManager { get; }
 
-		public bool IsSplitActive => _splitWindows.Count > 1;
+		public bool IsSplitActive
+		{
+			get { lock (_stateLock) return _splitWindows.Count > 1; }
+		}
 
 		public SceneManager(WindowsManager windowsManager)
 		{
@@ -39,6 +43,8 @@ namespace StageManager
 		{
 			if (Thread.CurrentThread.ManagedThreadId != 1)
 				throw new NotSupportedException("Start must be called on the main thread.");
+
+			_syncContext = SynchronizationContext.Current;
 
 			WindowsManager.WindowCreated += WindowsManager_WindowCreated;
 			WindowsManager.WindowUpdated += WindowsManager_WindowUpdated;
@@ -55,7 +61,7 @@ namespace StageManager
 
 		private void WindowsManager_WindowUpdated(IWindow window, WindowUpdateType type)
 		{
-			if (_suspend) return;
+			if (_transitionLock.CurrentCount == 0) return;
 
 			if (type == WindowUpdateType.Foreground)
 				AutoSwitchToSceneByWindow(window);
@@ -63,72 +69,107 @@ namespace StageManager
 
 		private void AutoSwitchToSceneByWindow(IWindow window)
 		{
-			if (_suspend) return;
+			if (_transitionLock.CurrentCount == 0) return;
 
-			var scene = FindSceneForWindow(window);
-			if (scene is null)
+			Scene? scene;
+			Scene? prior;
+			SceneChangedEventArgs? createdArgs = null;
+			CurrentSceneSelectionChangedEventArgs? selectionArgs = null;
+
+			lock (_stateLock)
 			{
-				scene = new Scene(GetWindowGroupKey(window), window);
-				_scenes.Add(scene);
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Created));
-			}
+				scene = FindSceneForWindow_NoLock(window.Handle);
+				if (scene is null)
+				{
+					scene = new Scene(GetWindowGroupKey(window), window);
+					_scenes.Add(scene);
+					createdArgs = new SceneChangedEventArgs(scene, window, ChangeType.Created);
+				}
 
-			if (object.Equals(scene, _current)) return;
+				if (object.Equals(scene, _current))
+					return;
 
-			try
-			{
-				_suspend = true;
-
-				var prior = _current;
+				prior = _current;
 				_current = scene;
 				_splitWindows.Clear();
 
 				foreach (var s in _scenes)
 					s.IsSelected = s.Equals(scene);
 
-				CurrentSceneSelectionChanged?.Invoke(this, new CurrentSceneSelectionChangedEventArgs(prior, _current));
+				selectionArgs = new CurrentSceneSelectionChangedEventArgs(prior, _current);
 			}
-			finally
+
+			RaiseOnCapturedContext(() =>
 			{
-				_suspend = false;
-			}
+				if (createdArgs is not null)
+					SceneChanged?.Invoke(this, createdArgs);
+
+				if (selectionArgs is not null)
+					CurrentSceneSelectionChanged?.Invoke(this, selectionArgs);
+			});
 		}
 
 		private void WindowsManager_UntrackedFocus(object? sender, IntPtr e)
 		{
-			if (_suspend) return;
+			if (_transitionLock.CurrentCount == 0) return;
 		}
 
 		private void WindowsManager_WindowDestroyed(IWindow window)
 		{
-			var scene = FindSceneForWindow(window);
-			if (scene is null) return;
+			Scene? scene;
+			List<SceneChangedEventArgs> sceneChangedArgs = new List<SceneChangedEventArgs>(capacity: 2);
 
-			_splitWindows.RemoveAll(w => w.Handle == window.Handle);
-
-			scene.Remove(window);
-
-			if (scene.Windows.Any())
+			lock (_stateLock)
 			{
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Updated));
+				scene = FindSceneForWindow_NoLock(window.Handle);
+				if (scene is null) return;
+
+				_splitWindows.RemoveAll(w => w.Handle == window.Handle);
+
+				scene.Remove(window);
+
+				if (scene.Windows.Any())
+				{
+					sceneChangedArgs.Add(new SceneChangedEventArgs(scene, window, ChangeType.Updated));
+				}
+				else
+				{
+					_scenes.Remove(scene);
+					sceneChangedArgs.Add(new SceneChangedEventArgs(scene, window, ChangeType.Removed));
+				}
 			}
-			else
+
+			RaiseOnCapturedContext(() =>
 			{
-				_scenes.Remove(scene);
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Removed));
-			}
+				foreach (var args in sceneChangedArgs)
+					SceneChanged?.Invoke(this, args);
+			});
 		}
 
 		public Scene? FindSceneForWindow(IWindow window) => FindSceneForWindow(window.Handle);
 
 		public Scene? FindSceneForWindow(IntPtr handle)
+		{
+			lock (_stateLock)
+			{
+				return FindSceneForWindow_NoLock(handle);
+			}
+		}
+
+		private Scene? FindSceneForWindow_NoLock(IntPtr handle)
 			=> _scenes.FirstOrDefault(s => s.Windows.Any(w => w.Handle == handle));
 
 		private void WindowsManager_WindowCreated(IWindow window, bool firstCreate)
 		{
-			var scene = new Scene(GetWindowGroupKey(window), window);
-			_scenes.Add(scene);
-			SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Created));
+			Scene scene;
+			lock (_stateLock)
+			{
+				scene = new Scene(GetWindowGroupKey(window), window);
+				_scenes.Add(scene);
+			}
+
+			RaiseOnCapturedContext(() =>
+				SceneChanged?.Invoke(this, new SceneChangedEventArgs(scene, window, ChangeType.Created)));
 
 			SwitchTo(scene).SafeFireAndForget();
 		}
@@ -137,35 +178,45 @@ namespace StageManager
 		{
 			if (object.Equals(scene, _current)) return;
 
+			await _transitionLock.WaitAsync();
 			try
 			{
-				_suspend = true;
+				Scene? prior;
+				IWindow? windowToFocus = null;
+				CurrentSceneSelectionChangedEventArgs? selectionArgs = null;
 
-				_splitWindows.Clear();
-
-				var prior = _current;
-				_current = scene;
-
-				foreach (var s in _scenes)
-					s.IsSelected = s.Equals(scene);
-
-				if (scene is not null)
+				lock (_stateLock)
 				{
-					var windowToFocus = scene.Windows.LastOrDefault();
-					if (windowToFocus is not null)
-					{
-						await Task.Delay(50).ConfigureAwait(true);
-						windowToFocus.BringToTop();
-						windowToFocus.Focus();
-					}
+					_splitWindows.Clear();
+
+					prior = _current;
+					_current = scene;
+
+					foreach (var s in _scenes)
+						s.IsSelected = s.Equals(scene);
+
+					if (scene is not null)
+						windowToFocus = scene.Windows.LastOrDefault();
+
+					selectionArgs = new CurrentSceneSelectionChangedEventArgs(prior, _current);
 				}
 
-				CurrentSceneSelectionChanged?.Invoke(this, new CurrentSceneSelectionChangedEventArgs(prior, _current));
+				if (windowToFocus is not null)
+				{
+					windowToFocus.BringToTop();
+					windowToFocus.Focus();
+				}
+
+				RaiseOnCapturedContext(() =>
+				{
+					if (selectionArgs is not null)
+						CurrentSceneSelectionChanged?.Invoke(this, selectionArgs);
+				});
 			}
 			finally
 			{
-				await Task.Delay(100).ConfigureAwait(true);
-				_suspend = false;
+				await Task.Delay(100);
+				_transitionLock.Release();
 			}
 		}
 
@@ -173,100 +224,116 @@ namespace StageManager
 		{
 			if (scene is null) return;
 
+			await _transitionLock.WaitAsync();
+			var lockHeld = true;
 			try
 			{
-				_suspend = true;
+				List<IWindow> splitSnapshot;
+				Scene? remainingSceneToSwitch = null;
 
-				if (_splitWindows.Count == 0 && _current is not null)
+				lock (_stateLock)
 				{
-					foreach (var w in _current.Windows)
-						_splitWindows.Add(w);
-				}
+					if (_splitWindows.Count == 0 && _current is not null)
+						_splitWindows.AddRange(_current.Windows);
 
-				var sceneWindow = scene.Windows.FirstOrDefault();
-				if (sceneWindow is null) return;
-
-				var existing = _splitWindows.FindIndex(sw => sw.Handle == sceneWindow.Handle);
-				if (existing >= 0)
-				{
-					_splitWindows.RemoveAt(existing);
-
-					if (_splitWindows.Count <= 1)
+					var sceneWindow = scene.Windows.FirstOrDefault();
+					if (sceneWindow is not null)
 					{
-						var remaining = _splitWindows.FirstOrDefault();
+						var existing = _splitWindows.FindIndex(sw => sw.Handle == sceneWindow.Handle);
+						if (existing >= 0)
+						{
+							_splitWindows.RemoveAt(existing);
+						}
+						else
+						{
+							foreach (var w in scene.Windows)
+							{
+								if (!_splitWindows.Any(sw => sw.Handle == w.Handle))
+									_splitWindows.Add(w);
+							}
+						}
+					}
+
+					splitSnapshot = _splitWindows.ToList();
+
+					if (splitSnapshot.Count <= 1)
+					{
+						var remaining = splitSnapshot.FirstOrDefault();
 						_splitWindows.Clear();
 
 						if (remaining is not null)
 						{
-							var remainingScene = FindSceneForWindow(remaining);
-							if (remainingScene is not null)
-							{
-								_suspend = false;
-								await SwitchTo(remainingScene);
-								return;
-							}
+							remainingSceneToSwitch = FindSceneForWindow_NoLock(remaining.Handle);
 						}
-						return;
-					}
-				}
-				else
-				{
-					foreach (var w in scene.Windows)
-					{
-						if (!_splitWindows.Any(sw => sw.Handle == w.Handle))
-							_splitWindows.Add(w);
 					}
 				}
 
-				foreach (var w in _splitWindows)
+				if (remainingSceneToSwitch is not null)
+				{
+					_transitionLock.Release();
+					lockHeld = false;
+					await SwitchTo(remainingSceneToSwitch);
+					return;
+				}
+
+				foreach (var w in splitSnapshot)
 					w.BringToTop();
 
-				await Task.Delay(50).ConfigureAwait(true);
-
-				var last = _splitWindows.LastOrDefault();
+				var last = splitSnapshot.LastOrDefault();
 				last?.Focus();
 
-				WindowLayoutManager.SplitScreen(_splitWindows);
+				WindowLayoutManager.SplitScreen(splitSnapshot);
 			}
 			finally
 			{
-				await Task.Delay(100).ConfigureAwait(true);
-				_suspend = false;
+				if (lockHeld)
+				{
+					await Task.Delay(100);
+					_transitionLock.Release();
+				}
 			}
 		}
 
-		public Task MoveWindow(Scene sourceScene, IWindow window, Scene targetScene)
+		public async Task MoveWindow(Scene sourceScene, IWindow window, Scene targetScene)
 		{
+			await _transitionLock.WaitAsync();
 			try
 			{
-				_suspend = true;
-
 				if (sourceScene is null || sourceScene.Equals(targetScene))
-					return Task.CompletedTask;
+					return;
 
-				sourceScene.Remove(window);
-				targetScene.Add(window);
+				List<SceneChangedEventArgs> sceneChangedArgs = new List<SceneChangedEventArgs>(capacity: 3);
 
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(sourceScene, window, ChangeType.Updated));
-				SceneChanged?.Invoke(this, new SceneChangedEventArgs(targetScene, window, ChangeType.Updated));
-
-				if (!sourceScene.Windows.Any())
+				lock (_stateLock)
 				{
-					_scenes.Remove(sourceScene);
-					SceneChanged?.Invoke(this, new SceneChangedEventArgs(sourceScene, window, ChangeType.Removed));
+					sourceScene.Remove(window);
+					targetScene.Add(window);
+
+					sceneChangedArgs.Add(new SceneChangedEventArgs(sourceScene, window, ChangeType.Updated));
+					sceneChangedArgs.Add(new SceneChangedEventArgs(targetScene, window, ChangeType.Updated));
+
+					if (!sourceScene.Windows.Any())
+					{
+						_scenes.Remove(sourceScene);
+						sceneChangedArgs.Add(new SceneChangedEventArgs(sourceScene, window, ChangeType.Removed));
+					}
 				}
+
+				RaiseOnCapturedContext(() =>
+				{
+					foreach (var args in sceneChangedArgs)
+						SceneChanged?.Invoke(this, args);
+				});
 
 				if (targetScene.Equals(_current))
 				{
 					window.BringToTop();
 					window.Focus();
 				}
-
-				return Task.CompletedTask;
 			}
 			finally
 			{
-				_suspend = false;
+				_transitionLock.Release();
 			}
 		}
 
@@ -275,8 +342,9 @@ namespace StageManager
 			var source = FindSceneForWindow(handle);
 			if (source is null || source.Equals(targetScene)) return;
 
-			var window = source.Windows.First(w => w.Handle == handle);
-			await MoveWindow(source, window, targetScene);
+			var window = source.Windows.FirstOrDefault(w => w.Handle == handle);
+			if (window != null)
+				await MoveWindow(source, window, targetScene);
 		}
 
 		public async Task PopWindowFrom(Scene sourceScene)
@@ -285,7 +353,7 @@ namespace StageManager
 
 			var window = sourceScene.Windows.LastOrDefault();
 			if (window is not null)
-				await MoveWindow(sourceScene, window, _current).ConfigureAwait(false);
+				await MoveWindow(sourceScene, window, _current);
 		}
 
 		private IEnumerable<IWindow> GetSceneableWindows()
@@ -294,21 +362,44 @@ namespace StageManager
 
 		public IEnumerable<Scene> GetScenes()
 		{
-			if (_scenes.Count == 0)
+			lock (_stateLock)
 			{
-				var windows = GetSceneableWindows()
-					.Select(w => new Scene(GetWindowGroupKey(w), w))
-					.ToList();
+				if (_scenes.Count == 0)
+				{
+					var windows = GetSceneableWindows()
+						.Select(w => new Scene(GetWindowGroupKey(w), w))
+						.ToList();
 
-				_scenes.AddRange(windows);
+					_scenes.AddRange(windows);
+				}
+
+				return _scenes.ToList();
 			}
-
-			return _scenes;
 		}
 
 		public IEnumerable<IWindow> GetCurrentWindows()
-			=> _current?.Windows ?? GetSceneableWindows();
+		{
+			lock (_stateLock)
+			{
+				if (_current?.Windows is not null)
+					return _current.Windows.ToList();
+			}
+
+			return GetSceneableWindows().ToList();
+		}
 
 		private string GetWindowGroupKey(IWindow window) => window.Handle.ToString();
+
+		private void RaiseOnCapturedContext(Action action)
+		{
+			var ctx = _syncContext;
+			if (ctx is null || SynchronizationContext.Current == ctx)
+			{
+				action();
+				return;
+			}
+
+			ctx.Post(_ => action(), null);
+		}
 	}
 }

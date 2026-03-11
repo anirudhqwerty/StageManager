@@ -13,9 +13,21 @@ namespace StageManager.Native
         private const int GAP = 8;
 
         [DllImport("user32.dll")]
-        private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref RECT pvParam, uint fWinIni);
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
-        private const uint SPI_GETWORKAREA = 0x0030;
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public uint cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
@@ -31,7 +43,7 @@ namespace StageManager.Native
 
             if (list.Count == 0) return;
 
-            var workArea = GetWorkArea();
+            var workArea = GetWorkAreaForWindow(list[0].Handle);
             int areaX = workArea.Left + SIDEBAR_WIDTH + GAP;
             int areaY = workArea.Top + GAP;
             int areaW = workArea.Right - areaX - GAP;
@@ -143,11 +155,20 @@ namespace StageManager.Native
             return slots;
         }
 
-        private static RECT GetWorkArea()
+        private static RECT GetWorkAreaForWindow(IntPtr hwnd)
         {
-            var rect = new RECT();
-            SystemParametersInfo(SPI_GETWORKAREA, 0, ref rect, 0);
-            return rect;
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor != IntPtr.Zero)
+            {
+                var info = new MONITORINFO();
+                info.cbSize = (uint)Marshal.SizeOf(info);
+                if (GetMonitorInfo(monitor, ref info))
+                {
+                    return info.rcWork;
+                }
+            }
+
+            return new RECT { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
         }
 
         private readonly struct WindowSlot

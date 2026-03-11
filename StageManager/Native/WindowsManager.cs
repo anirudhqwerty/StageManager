@@ -25,7 +25,7 @@ namespace StageManager.Native
 
 		private readonly List<IntPtr> _winEventHooks = new();
 
-		private Dictionary<WindowsWindow, bool> _floating;
+		private ConcurrentDictionary<WindowsWindow, bool> _floating;
 		private IntPtr _currentProcessWindowHandle;
 		private int _currentProcessId;
 
@@ -43,7 +43,7 @@ namespace StageManager.Native
 		public WindowsManager()
 		{
 			_windows = new ConcurrentDictionary<IntPtr, WindowsWindow>();
-			_floating = new Dictionary<WindowsWindow, bool>();
+			_floating = new ConcurrentDictionary<WindowsWindow, bool>();
 			_hookDelegate = new WinEventDelegate(WindowHook);
 		}
 
@@ -103,14 +103,13 @@ namespace StageManager.Native
 			var window = _windows.Values.FirstOrDefault(w => w.IsFocused);
 			if (window != null)
 			{
-				if (_floating.ContainsKey(window))
+				if (_floating.TryRemove(window, out _))
 				{
-					_floating.Remove(window);
 					HandleWindowAdd(window, false);
 				}
 				else
 				{
-					_floating[window] = true;
+					_floating.TryAdd(window, true);
 					HandleWindowRemove(window);
 					window.BringToTop();
 				}

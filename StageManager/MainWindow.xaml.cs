@@ -27,6 +27,7 @@ namespace StageManager
 		private IntPtr _thisHandle;
 		private TaskPoolGlobalHook? _hook;
 		private volatile bool _hookPaused;
+		private volatile WindowMode _targetMode = WindowMode.OffScreen;
 		private WindowMode _mode;
 		private double _lastWidth;
 		private Point _mouse = new Point(0, 0);
@@ -285,6 +286,7 @@ namespace StageManager
 					return;
 
 				_mode = value;
+				_targetMode = value;
 				this.Topmost = value == WindowMode.Flyover;
 				ApplyWindowMode();
 			}
@@ -347,12 +349,15 @@ namespace StageManager
 			var sh = _cachedPhysicalScreenHeight;
 			bool isLeftCenter = e.Data.X <= 1 && e.Data.Y > sh / 3 && e.Data.Y < 2 * sh / 3;
 
-			if (Mode == WindowMode.OffScreen && isLeftCenter)
+			// Only queue a Dispatcher call once per transition to avoid flooding the UI thread.
+			if (_targetMode == WindowMode.OffScreen && isLeftCenter)
 			{
+				_targetMode = WindowMode.Flyover;
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.Flyover);
 			}
-			else if (Mode == WindowMode.Flyover && e.Data.X > _lastWidth + 40)
+			else if (_targetMode == WindowMode.Flyover && e.Data.X > _lastWidth + 40)
 			{
+				_targetMode = WindowMode.OffScreen;
 				Dispatcher.BeginInvoke(() => Mode = WindowMode.OffScreen);
 			}
 
