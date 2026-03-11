@@ -10,6 +10,13 @@ This prototype groups applications by their process. By switching between so cal
 
 Windows can be moved from one scene to another by dragging them onto scenes on the left.
 
+## Recent Updates
+
+*   **Split-Screen Layout Support**: Use `Ctrl+Click` on a scene to seamlessly open it in a full-screen split-screen layout alongside your active window. Features an atomic layout system for tear-free window positioning.
+*   **Enhanced UI/UX**: Implemented modern aesthetic enhancements including support for the Mica backdrop and fixed DWM thumbnail clipping bugs for a cohesive feel.
+*   **Performance Optimizations**: Overhauled the internal tracking systems to prevent UI thread Dispatcher flooding, resolving lag/stutters and CPU spikes.
+*   **Targeted Stability Fixes**: Eliminated severe GDI memory leaks from cached icons, race condition crashes in scene toggling, and background tracking issues.
+
 ## Usage
 
 Download and run the executable from the [Releases tab](https://github.com/awaescher/StageManager/releases/) or 
